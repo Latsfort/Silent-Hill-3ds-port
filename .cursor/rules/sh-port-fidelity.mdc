@@ -1,0 +1,45 @@
+---
+description: Silent Hill 1 3DS port - fidelity rules and decomp workflow
+alwaysApply: true
+---
+
+# Silent Hill 3DS port: fidelity first
+
+Goal: reproduce the PS1 game exactly (scenes, cameras, timings, texts). The source of truth is
+`vendor/silent-hill-decomp` (C decomp) and the ROM dump in `dump/assets` / `romfs/`.
+
+## Never invent
+- No made-up texts, hints, values, boxes, enemies or timings. Every constant must come from the decomp.
+- Cite the origin in a short comment when porting: `/* MapEvent_CutsceneExitCafe case 7 */`.
+- If the decomp has no answer, stop and say so instead of guessing.
+
+## Workflow (do this before writing code)
+1. `python tools/sh_lookup.py func <Name>`: retail function, flags and map messages annotated.
+2. `python tools/sh_lookup.py map map2_s00`: files and `MapEvent_*` functions of a map.
+3. `python tools/sh_lookup.py msg map2_s00 16`: exact in-game text (NTSC-U).
+4. `python tools/sh_lookup.py flag 874` / `flag CofeArrow`: event flags.
+5. `python tools/sh_lookup.py events map2_s00 [regex]`: which event fires where (function, flags,
+   trigger, map point). `spawns MAP` = enemy spawns, `point MAP IDX` = one map point.
+6. Tables: never hand-copy numbers. Map points/spawns/events:
+   `python tools/gen_map_data.py MAP source/game/mapdata_MAP.h` (types in `include/sh3ds/mapdata.h`).
+   Common pickups: `python tools/gen_common_pickups.py MAP source/game/map_pickups_MAP.h`.
+   Camera roads: `tools/gen_vc_roads.py`. Other tables: write a generator, verify with a script compare.
+7. Build with `make -j4` (devkitPro); it must finish with zero errors and zero warnings.
+
+## Units and conversions
+- Q12: `Q12(1.0) = 4096`. Angles in Q12 are turns: `Q12(0.25)` = 90 deg.
+  `sh_lookup.py q12 0x36A`.
+- Per-frame PS1 counters assume 30 fps: `x += k` per frame becomes `x += k * 30 * dt`.
+- Screen fades: `Q12(3.0)`/s by default (about 0.33 s), `3.0/(queue+1)` while a file is loading.
+- Gameplay FOV 53.13 deg. The game does not zoom when aiming.
+
+## Coordinates PS1 -> 3DS
+- Position: `(x, y, z)` becomes `(x, -y, -z)`. PS1 Y points down: feet y=0, head about -1.7.
+- Yaw: `yaw_3ds = -yaw_ps1`. Forward on 3DS = `(-sin yaw, -cos yaw)`.
+- Camera look-at: `yaw = atan2f(-dx, -dz)`, `pitch = atan2f(dy, horiz)` (positive = up).
+- `sh_lookup.py coord X Y Z YAW` does the conversion.
+
+## Event ports
+- Keep retail `case` numbers in `switch (step)` and the same skip/fallthrough logic.
+- Set the same `EventFlag_*` at the same step (`sh_save_event_set`).
+- Map messages wait for a button when the decomp uses `Event_DisplayMapMsg`.

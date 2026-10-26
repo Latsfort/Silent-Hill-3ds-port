@@ -1,0 +1,30 @@
+# Build
+build/
+*.elf
+*.3dsx
+*.smdh
+*.cia
+*.d
+*.o
+*.map
+dist/
+__pycache__/
+*.py[cod]
+*.exe
+
+# Local assets / dumps (never commit)
+dump/
+romfs/game/
+assets/private/
+*.bin
+*.img
+*.iso
+*.cue
+*.ecm
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

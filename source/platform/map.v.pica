@@ -1,0 +1,61 @@
+; Map geometry: position in meters, atlas texcoord, baked per-vertex color as 0-255 bytes.
+
+.fvec projection[4], modelView[4]
+.fvec worldModel[4], envTint, envParams, envLightPos, envLightPositive, envLightNegative
+
+.constf consts(0.0, 1.0, 0.00392156862, 0.0)
+.alias  ones   consts.yyyy
+.alias  inv255 consts.zzzz
+
+.out outpos position
+.out outtc0 texcoord0
+.out outclr color
+
+.alias inpos v0
+.alias intc0 v1
+.alias inclr v2
+
+.proc main
+	mov r0.xyz, inpos
+	mov r0.w,   ones
+
+	dp4 r1.x, modelView[0], r0
+	dp4 r1.y, modelView[1], r0
+	dp4 r1.z, modelView[2], r0
+	dp4 r1.w, modelView[3], r0
+
+	dp4 outpos.x, projection[0], r1
+	dp4 outpos.y, projection[1], r1
+	dp4 outpos.z, projection[2], r1
+	dp4 outpos.w, projection[3], r1
+
+	mov outtc0, intc0
+	mul r5, inv255, inclr
+	mov r7, envLightPos
+	mov r8, envLightPositive
+	mov r9, envLightNegative
+	mov r10, envParams
+	mov r11, envTint
+	mov r12, consts
+	dp4 r2.x, worldModel[0], r0
+	dp4 r2.y, worldModel[1], r0
+	dp4 r2.z, worldModel[2], r0
+	add r2.xyz, r2, -r7
+	max r3.xyz, r2, r12.xxxx
+	max r4.xyz, -r2, r12.xxxx
+	mad r3.xyz, r3, r8, r8.wwww
+	mad r4.xyz, r4, r9, r9.wwww
+	min r3.xyz, r3, r4
+	min r3.x, r3.x, r3.y
+	min r3.x, r3.x, r3.z
+	add r3.x, r3.x, r10.y
+	max r3.x, r3.x, r12.x
+	min r3.x, r3.x, r10.z
+	mul r3.x, r3.x, r10.w
+	mul r6.xyz, r5, r11
+	mul r6.xyz, r6, r3.xxxx
+	add r6.xyz, r6, -r5
+	mad outclr.xyz, r6, r10.xxxx, r5
+	mov outclr.w, r5.w
+	end
+.end

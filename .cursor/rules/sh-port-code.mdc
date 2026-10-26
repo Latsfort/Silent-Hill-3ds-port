@@ -1,0 +1,31 @@
+---
+description: Code layout and conventions of the 3DS port sources
+globs: source/**,include/**
+alwaysApply: false
+---
+
+# Port code map
+
+- `source/game/game.c`: main loop, asset loading (`SH_TEXTURE_DIR` = `romfs:/game/tim`), HUD fill.
+- `source/game/cafe.c`, `alley.c`, `town.c`: one module per area/event chain (`ShCafe`, `ShTown`...).
+  Pattern: `sh_<area>_begin/update/camera/subtitle/hint/fade/letterbox`.
+- `source/game/vc.c` + `vc_roads_*.h`: retail VC camera (vc_main.c). Feed PS1 coords:
+  `sh_vc_update(&vc, (float[3]){px, -py, -pz}, -yaw, enemy_near, dt, &cam)`.
+- `source/game/papermap.c`: paper map markings (D_800AE8A0) and expanding boxes.
+- `source/platform/gfx.c`: citro3d rendering; `sh_gfx_draw_map(cam, player, actors, n, &hud)`.
+- Save/flags: `sh_save_event_get/set(save, flag)`, items `sh_save_item_count`.
+- Sounds: `sh_snd_play(id, ...)`, `sh_snd_at(id, pos, vol)`; BGM `sh_bgm_*`.
+
+# Style
+- C99, 4 spaces, `snake_case`, `sh_` prefix for public API, `static` for file-local.
+- Short comments only for retail origin or non-obvious constraints.
+- Keep data generated in `tools/` (Python), output as `static const` headers in `source/game/`.
+
+```c
+/* GOOD: retail step, citing origin */
+case 7: /* ExitCafe: D_800F228C += Q12(0.008) per frame */
+    t->map_d = fminf(t->map_d + 0.008f * PS1_FPS * dt, 1.0f);
+
+/* BAD: invented value with no source */
+    t->map_d += 0.5f * dt;
+```

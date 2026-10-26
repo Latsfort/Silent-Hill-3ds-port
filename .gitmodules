@@ -1,0 +1,3 @@
+[submodule "vendor/silent-hill-decomp"]
+	path = vendor/silent-hill-decomp
+	url = https://github.com/shdecompilations/silent-hill-decomp.git
