@@ -20,6 +20,8 @@ void sh_sound_update(float dt);
 
 /* Renders interleaved stereo PCM at 44100 Hz (used by the NDSP thread and host tests). */
 void sh_sound_render(int16_t *dst, int frames);
+bool sh_sound_movie_begin(const char *path);
+void sh_sound_movie_end(void);
 
 void sh_sd_call(uint32_t cmd);
 uint8_t sh_sfx_play(uint16_t sfx, int8_t balance, uint8_t vol);

@@ -1,7 +1,9 @@
 #include "sh3ds/alley.h"
+#include "sh3ds/alley_progress.h"
 #include "sh3ds/controls.h"
 #include "sh3ds/snd.h"
 #include "sh3ds/sound.h"
+#include "sh3ds/vc.h"
 
 #include <3ds.h>
 #include <math.h>
@@ -15,6 +17,9 @@
 #define PI_F ((float)M_PI)
 #define DEG(d) ((d) * (PI_F / 180.0f))
 #define ANIM_ST(idx) (((idx) << 1) | 1)
+
+#include "alley_camera_data.h"
+#include "alley_npc_data.h"
 
 /* MAP_POINTS / cutscene anchors (PS1 → 3DS). */
 #define SH_INTRO_SPAWN_X (-6.2f)
@@ -86,7 +91,7 @@ static void cam_look_at(ShCamera *cam, float tx, float ty, float tz)
     const float dy = ty - cam->pos[1];
     const float dz = tz - cam->pos[2];
     const float horiz = sqrtf(dx * dx + dz * dz);
-    cam->yaw = atan2f(dx, -dz);
+    cam->yaw = atan2f(-dx, -dz);
     cam->pitch = atan2f(dy, horiz > 0.01f ? horiz : 0.01f);
 }
 
@@ -118,7 +123,7 @@ static void sample_open_cam(ShAlley *alley, float frame)
     alley->cam.pos[1] = p3[1];
     alley->cam.pos[2] = p3[2];
     cam_look_at(&alley->cam, l3[0], l3[1], l3[2]);
-    alley->cam.fov_deg = proj > 20.0f ? 2.0f * atan2f(120.0f, proj) * (180.0f / PI_F) : 48.0f;
+    alley->cam.fov_deg = proj > 20.0f ? 2.0f * atan2f(120.0f, proj) * (180.0f / PI_F) : SH_VC_FOV_DEG;
     alley->cam_active = true;
 }
 
@@ -244,7 +249,7 @@ static bool cheryl_move_to(ShAlley *alley, float tx, float tz, float speed, floa
         alley->cheryl_pos[0] += dx / d * step;
         alley->cheryl_pos[2] += dz / d * step;
     }
-    alley->cheryl_yaw = atan2f(dx, -dz);
+    alley->cheryl_yaw = atan2f(-dx, -dz);
     alley->cheryl_anim += dt;
     return false;
 }
@@ -305,6 +310,7 @@ static void place_harry(ShAlley *alley, float *px, float *py, float *pz, float *
         *yaw = yaw_rad;
     }
     alley->need_ground_snap = true;
+    sh_vc_warp(&alley->vc);
 }
 
 static void spawn_street(ShAlley *alley, float *px, float *py, float *pz, float *yaw)
@@ -327,8 +333,11 @@ void sh_alley_reset(ShAlley *alley)
     }
     voice_stop(alley);
     memset(alley, 0, sizeof(*alley));
+    alley->darkness = -1;
     alley->stage = SH_ALLEY_OFF;
     alley->timer = -1.0f;
+    sh_vc_init(&alley->vc, s_alley_camera_roads,
+               sizeof(s_alley_camera_roads) / sizeof(s_alley_camera_roads[0]));
 }
 
 void sh_alley_begin(ShAlley *alley, ShSavegame *save)
@@ -400,7 +409,7 @@ static void opening_update(ShAlley *alley, float *px, float *py, float *pz, floa
     if (sh_input_down(input, KEY_START) && alley->step > 1) {
         voice_stop(alley);
         fade_to(alley, 0.0f, 2.0f);
-        set_msg(alley, NULL, "Cheryl... where could you be?", 2.5f);
+        set_msg(alley, NULL, NULL, 0.0f);
         spawn_street(alley, px, py, pz, yaw);
         return;
     }
@@ -481,7 +490,7 @@ static void opening_update(ShAlley *alley, float *px, float *py, float *pz, floa
         }
         break;
     default:
-        set_msg(alley, NULL, "Find Cheryl.\nWalk toward the fog — listen for footsteps.", 4.0f);
+        set_msg(alley, NULL, NULL, 0.0f);
         spawn_street(alley, px, py, pz, yaw);
         alley->cheryl_visible = false;
         break;
@@ -503,31 +512,9 @@ static bool in_footsteps_zone(float px, float pz)
     return pz > SH_FOOT_Z - 6.0f && pz < SH_FOOT_Z + 4.0f && px > -14.0f && px < 24.0f;
 }
 
-/* MAP_POINTS[15]/[16] TouchAabb for MapEvent_CutsceneCherylIntoTheAlley. */
-static bool near_alley_gate(float px, float pz)
-{
-    /* pt 15: (-56, 126) param 4/24 → half (1, 6); pt 16: (-57, 116) half (1, 4). */
-    if (fabsf(px - (-56.0f)) <= 1.0f && fabsf(pz - (-126.0f)) <= 6.0f) {
-        return true;
-    }
-    if (fabsf(px - (-57.0f)) <= 1.0f && fabsf(pz - (-116.0f)) <= 4.0f) {
-        return true;
-    }
-    /* Street-side approach: fence collision stops before the AABB — widen. */
-    if (px > -70.0f && px < -48.0f && pz > -138.0f && pz < -118.0f) {
-        return true;
-    }
-    return false;
-}
-
 /* MapEvent_GreyChildrenSpawn poses (PS1 → 3DS). */
 static void spawn_grey_children(ShAlley *alley)
 {
-    static const float ps1[SH_ALLEY_MAX_GREY][3] = {
-        {-252.0f, 223.0f, 180.0f},
-        {-254.0f, 221.0f, 135.0f},
-        {-259.0f, 232.0f, 0.0f},
-    };
     alley->grey_count = SH_ALLEY_MAX_GREY;
     alley->need_grey_assets = true;
     alley->cheryl_visible = false;
@@ -535,10 +522,10 @@ static void spawn_grey_children(ShAlley *alley)
         ShAlleyGrey *g = &alley->grey[i];
         memset(g, 0, sizeof(*g));
         g->alive = true;
-        g->pos[0] = ps1[i][0];
+        g->pos[0] = (float)s_alley_grey_spawns[i].x / 4096.0f;
         g->pos[1] = 0.0f;
-        g->pos[2] = -ps1[i][1];
-        g->yaw = -DEG(ps1[i][2]);
+        g->pos[2] = -(float)s_alley_grey_spawns[i].z / 4096.0f;
+        g->yaw = -(float)s_alley_grey_spawns[i].yaw * (2.0f * PI_F / 4096.0f);
         g->hp = 40.0f;
     }
 }
@@ -561,7 +548,7 @@ static void grey_update(ShAlley *alley, float px, float pz, float dt)
             const float sp = 1.6f * dt;
             g->pos[0] += dx / d * sp;
             g->pos[2] += dz / d * sp;
-            g->yaw = atan2f(dx, -dz);
+            g->yaw = atan2f(-dx, -dz);
         }
     }
 }
@@ -597,7 +584,7 @@ static void set_spot_cam(ShAlley *alley, float t)
     alley->cam.pos[1] = SH_SPOT_CAM_Y + 1.5f * u;
     alley->cam.pos[2] = SH_SPOT_CAM_Z + 4.0f * u;
     cam_look_at(&alley->cam, alley->cheryl_pos[0], 1.0f, alley->cheryl_pos[2]);
-    alley->cam.fov_deg = 48.0f;
+    alley->cam.fov_deg = SH_VC_FOV_DEG;
     alley->cam_active = true;
 }
 
@@ -612,7 +599,7 @@ static void set_alley_cam_behind(ShAlley *alley, float px, float py, float pz)
     alley->cam.pos[1] = py + 2.24f;
     alley->cam.pos[2] = pz - 5.0f;
     cam_look_at(&alley->cam, px - 0.3f, py + 0.7f, pz + 8.0f);
-    alley->cam.fov_deg = 50.0f;
+    alley->cam.fov_deg = SH_VC_FOV_DEG;
     alley->cam_active = true;
 }
 
@@ -627,18 +614,9 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
     msg_tick(alley, dt);
     voice_tick(alley, dt);
 
-    if (sh_input_down(input, KEY_Y) && alley->stage != SH_ALLEY_OPENING &&
-        alley->stage != SH_ALLEY_TO_CAFE && alley->stage != SH_ALLEY_BLACKOUT) {
-        fade_to(alley, 1.0f, 2.0f);
-        alley->stage = SH_ALLEY_BLACKOUT;
-        alley->step = 0;
-        alley->wait = 0.0f;
-        alley->controls_locked = true;
-        return true;
-    }
-
     const float px = player_x ? *player_x : 0.0f;
     const float pz = player_z ? *player_z : 0.0f;
+    sh_alley_progress_update(alley, save, px, pz, dt);
 
     switch (alley->stage) {
     case SH_ALLEY_OPENING:
@@ -697,12 +675,17 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         break;
 
     case SH_ALLEY_FMV:
-        /* SysState_Fmv 16 stub — hold black (no building clip). */
+        /* MAP_EVENTS[5], SysState_Fmv_Update: completion follows playback or retail skip. */
         alley->controls_locked = true;
         alley->letterbox = true;
         alley->cam_active = false;
         alley->cheryl_visible = false;
-        if (fade_done(alley) && wait_timer(alley, 1.6f, dt)) {
+        if (!alley->movie_finished) {
+            if (fade_done(alley)) { alley->movie_requested = true; }
+            break;
+        }
+        if (fade_done(alley)) {
+            alley->movie_finished = false;
             sh_save_event_set(save, SH_EV_ALLEY_FMV);
             /* MAP_POINTS-ish: Bachman facing Cheryl (PS1 −26, 127). */
             place_harry(alley, player_x, player_y, player_z, player_yaw, -26.0f, -127.0f, DEG(-135.0f));
@@ -781,7 +764,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             alley->stage = SH_ALLEY_CHASE;
             alley->step = 0;
             alley->cheryl_wp = (alley->cheryl_wp < 2) ? alley->cheryl_wp : 2;
-            set_msg(alley, NULL, "I'd better follow Cheryl...", 3.0f);
+            set_msg(alley, NULL, NULL, 0.0f);
             break;
         }
         if (alley->harry_anim_status != 0) {
@@ -804,7 +787,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             cheryl_move_to(alley, SH_ALLEY_GATE_X, SH_ALLEY_GATE_Z, 2.5f, dt);
         }
 
-        if (!sh_save_event_get(save, SH_EV_REDIRECT) && in_redirect_zone(px, pz)) {
+        if (!alley->redirected && in_redirect_zone(px, pz)) {
             alley->stage = SH_ALLEY_REDIRECT;
             alley->step = 0;
             alley->wait = 0.0f;
@@ -812,8 +795,8 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             break;
         }
 
-        alley->skip_collision = near_alley_gate(px, pz);
-        if (near_alley_gate(px, pz)) {
+        alley->skip_collision = sh_alley_gate_trigger(px, pz);
+        if (sh_alley_gate_trigger(px, pz)) {
             alley->stage = SH_ALLEY_INTO;
             alley->step = 0;
             alley->wait = 0.0f;
@@ -850,7 +833,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
                     const float t = fminf(1.0f, 2.2f * dt / d);
                     *player_x += dx * t;
                     *player_z += dz * t;
-                    *player_yaw = atan2f(dx, -dz);
+                    *player_yaw = atan2f(-dx, -dz);
                 }
             }
             if (wait_timer(alley, 2.5f, dt)) {
@@ -858,7 +841,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             }
             break;
         default:
-            sh_save_event_set(save, SH_EV_REDIRECT);
+            alley->redirected = true;
             alley->controls_locked = false;
             alley->letterbox = false;
             alley->harry_anim_status = 0;
@@ -912,7 +895,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             place_harry(alley, player_x, player_y, player_z, player_yaw, SH_ALLEY_X, SH_ALLEY_GATE_Z + 8.0f, PI_F);
             alley->stage = SH_ALLEY_ROAM;
             alley->step = 0;
-            set_msg(alley, NULL, "Follow Cheryl down the alley.", 3.0f);
+            set_msg(alley, NULL, NULL, 0.0f);
             break;
         }
         if (alley->harry_anim_status != 0) {
@@ -924,6 +907,9 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         alley->controls_locked = false;
         alley->cam_active = false;
         alley->letterbox = false;
+        if (sh_alley_room_begin(alley, save, px, pz, player_yaw ? *player_yaw : 0.0f, input)) {
+            break;
+        }
         /* Keep soft pass near the mouth until Harry is clear of the fence. */
         alley->skip_collision = pz < SH_ALLEY_GATE_Z + 12.0f;
         if (alley->cheryl_wp < 4) {
@@ -932,8 +918,8 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
                 alley->cheryl_wp++;
             }
         }
-        /* Trigger darker when Harry is deep enough (retail EventFlag_15 path). */
-        if (pz < -85.0f && px > SH_ALLEY_X - 6.0f && px < SH_ALLEY_X + 6.0f) {
+        /* MAP_EVENTS[23]: tick, required EventFlag_15, complete EventFlag_17. */
+        if (sh_save_event_get(save, 15) && !sh_save_event_get(save, SH_EV_ALLEY_DARK)) {
             alley->stage = SH_ALLEY_DARKER;
             alley->step = 0;
             alley->wait = 0.0f;
@@ -941,6 +927,13 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             alley->letterbox = true;
             alley->skip_collision = false;
             fade_to(alley, 0.65f, 0.7f);
+        } else if (sh_alley_nightmare_trigger(save, px, pz)) {
+            alley->stage = SH_ALLEY_NIGHTMARE;
+            alley->step = 0;
+            alley->wait = 0.0f;
+            alley->controls_locked = true;
+            alley->letterbox = true;
+            fade_to(alley, 1.0f, 3.0f);
         }
         break;
 
@@ -950,14 +943,19 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         alley->cam_active = false;
         switch (alley->step) {
         case 0:
-            set_msg(alley, "That's strange,\nit's getting darker.", NULL, 3.5f);
-            if (wait_timer(alley, 3.5f, dt)) {
+            /* MapEven_CutsceneAlleyGetsDarker case 4: message 25 has no ~J timeout. */
+            set_msg(alley, "That's strange,\nit's getting darker.", NULL, 0.0f);
+            if (sh_input_down(input, SH_BTN_ACTION)) {
+                set_msg(alley, NULL, NULL, 0.0f);
                 step_next(alley);
             }
             break;
         case 1:
-            set_msg(alley, "......better than nothing,\nI guess.", NULL, 2.5f);
-            if (wait_timer(alley, 2.5f, dt)) {
+            /* MapEven_CutsceneAlleyGetsDarker case 11: message 30 waits for input. */
+            sh_save_event_set(save, SH_EV_ALLEY_DARK);
+            set_msg(alley, "......better than nothing,\nI guess.", NULL, 0.0f);
+            if (sh_input_down(input, SH_BTN_ACTION)) {
+                set_msg(alley, NULL, NULL, 0.0f);
                 step_next(alley);
             }
             break;
@@ -966,10 +964,12 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             fade_to(alley, 0.0f, 1.0f);
             /* MapEven_CutsceneAlleyGetsDarker default: Chara_Spawn Grey Children. */
             spawn_grey_children(alley);
-            alley->stage = SH_ALLEY_DEAD_END;
+            alley->stage = SH_ALLEY_ROAM;
             alley->step = 0;
             alley->wait = 0.0f;
             alley->cheryl_visible = false;
+            alley->controls_locked = false;
+            alley->letterbox = false;
             break;
         }
         break;
@@ -978,9 +978,9 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         alley->controls_locked = true;
         alley->letterbox = true;
         alley->cam_active = false;
-        set_msg(alley, "A dead end?\nWhat the hell!?", NULL, 3.0f);
-        if (wait_timer(alley, 3.0f, dt)) {
-            alley->stage = SH_ALLEY_FIGHT;
+        set_msg(alley, "A dead end?\nWhat the hell!?", NULL, 0.0f);
+        if (sh_input_down(input, SH_BTN_ACTION)) {
+            alley->stage = SH_ALLEY_ROAM;
             alley->step = 0;
             alley->wait = 0.0f;
             alley->controls_locked = false;
@@ -994,7 +994,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         break;
 
     case SH_ALLEY_FIGHT:
-        /* Free roam vs Grey Children until cleared, then nightmare lines. */
+        /* MapEvent_CutsceneAlleyNightmare default enables the aggressive phase. */
         alley->controls_locked = false;
         alley->letterbox = false;
         alley->cam_active = false;
@@ -1016,7 +1016,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             }
         }
         if (grey_alive_count(alley) == 0 || wait_timer(alley, 45.0f, dt)) {
-            alley->stage = SH_ALLEY_NIGHTMARE;
+            alley->stage = SH_ALLEY_BLACKOUT;
             alley->step = 0;
             alley->wait = 0.0f;
             alley->controls_locked = true;
@@ -1065,11 +1065,12 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             break;
         default:
             sh_save_event_set(save, SH_EV_NIGHTMARE);
-            alley->stage = SH_ALLEY_BLACKOUT;
+            alley->stage = SH_ALLEY_FIGHT;
             alley->step = 0;
             alley->wait = 0.0f;
-            alley->fade = 1.0f;
-            alley->fade_target = 1.0f;
+            alley->controls_locked = false;
+            alley->letterbox = false;
+            fade_to(alley, 0.0f, 3.0f);
             break;
         }
         break;
@@ -1085,6 +1086,15 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         voice_stop(alley);
         if (wait_timer(alley, 1.8f, dt)) {
             finish_to_cafe(alley, save);
+        }
+        break;
+
+    case SH_ALLEY_ROOM:
+        alley->controls_locked = true;
+        alley->cam_active = false;
+        if (fade_done(alley)) {
+            if (alley->room_complete_flag) { sh_save_event_set(save, alley->room_complete_flag); }
+            alley->room_ready = true;
         }
         break;
 
@@ -1112,25 +1122,8 @@ const char *sh_alley_dialogue(const ShAlley *alley)
 
 const char *sh_alley_hint(const ShAlley *alley)
 {
-    if (!alley || alley->stage == SH_ALLEY_OFF) {
-        return "";
-    }
-    if (alley->stage == SH_ALLEY_OPENING) {
-        return "START : skip opening";
-    }
-    if (alley->stage == SH_ALLEY_CHASE) {
-        return "L : run    Stick : move\nFollow Cheryl into the alley";
-    }
-    if (alley->stage == SH_ALLEY_ROAM) {
-        return "L : run    Stick : move\nKeep going down the alley";
-    }
-    if (alley->stage == SH_ALLEY_FIGHT) {
-        return "L : run    A : attack\nGrey children";
-    }
-    if (alley->controls_locked) {
-        return "A / wait...";
-    }
-    return "L : run    Stick : move\nY : skip to cafe";
+    (void)alley;
+    return "";
 }
 
 bool sh_alley_letterbox(const ShAlley *alley)
@@ -1151,6 +1144,30 @@ bool sh_alley_camera(const ShAlley *alley, ShCamera *out)
     if (out) {
         *out = alley->cam;
     }
+    return true;
+}
+
+bool sh_alley_gameplay_camera(ShAlley *alley, const float position[3], float yaw, float dt, ShCamera *out)
+{
+    if (!sh_alley_active(alley)) { return false; }
+    if (alley->cam_active) {
+        alley->vc_scripted = true;
+        return false;
+    }
+    if (alley->vc_scripted || alley->room_ready) { sh_vc_warp(&alley->vc); }
+    alley->vc_scripted = false;
+    bool near_enemy = false;
+    /* vcSetNearestEnemyDataInVC_WORK: nearest living enemy strictly within 15 m. */
+    for (int i = 0; i < alley->grey_count; i++) {
+        const ShAlleyGrey *enemy = &alley->grey[i];
+        if (alley->stage == SH_ALLEY_FIGHT && enemy->alive && enemy->hp >= 0.0f &&
+            dist2_xz(position[0], position[2], enemy->pos[0], enemy->pos[2]) < 15.0f * 15.0f) {
+            near_enemy = true;
+            break;
+        }
+    }
+    const float ps1_position[3] = {position[0], -position[1], -position[2]};
+    sh_vc_update(&alley->vc, ps1_position, -yaw, near_enemy, dt, out);
     return true;
 }
 
@@ -1192,6 +1209,10 @@ int sh_alley_actor_keyframe(const ShAlley *alley, int slot, int kf_count)
     }
     float t = alley->cheryl_anim;
     if (alley->grey_count > 0 && slot < alley->grey_count) {
+        /* StalkerControl_1 skips animation updates until Nightmare activates it. */
+        if (alley->stage != SH_ALLEY_FIGHT && alley->stage != SH_ALLEY_BLACKOUT) {
+            return ALLEY_GREY_FROZEN_KEYFRAME < kf_count ? ALLEY_GREY_FROZEN_KEYFRAME : 0;
+        }
         t = alley->grey[slot].anim;
     }
     const int span = kf_count < 20 ? kf_count : 20;

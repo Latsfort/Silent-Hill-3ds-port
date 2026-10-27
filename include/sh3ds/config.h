@@ -5,6 +5,10 @@
 #define SH3DS_TARGET_OLD3DS 1
 #endif
 
+#ifndef SH3DS_DEVELOPMENT
+#define SH3DS_DEVELOPMENT 0
+#endif
+
 /* Static pools for game/runtime buffers (not GPU memory). */
 #define SH3DS_FRAME_ARENA_BYTES (1u * 1024u * 1024u)  /* scratch, reset every update */
 #define SH3DS_STREAM_ARENA_BYTES (5u * 1024u * 1024u) /* map window rebuilt over several frames */

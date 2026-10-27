@@ -71,6 +71,8 @@ typedef enum ShBirdState {
 #define SH_CAFE_DMS_MAX 5120
 
 typedef struct ShCafe {
+    bool save_requested;
+    uint8_t save_location;
     ShCafeStage stage;
     int step;      /* decomp g_SysWork.sysStateSteps[0] */
     float timer;   /* g_Cutscene_Timer in DMS frames, < 0 = none */

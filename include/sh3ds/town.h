@@ -83,6 +83,8 @@ typedef struct ShTownDog {
 } ShTownDog;
 
 typedef struct ShTown {
+    bool save_requested;
+    uint8_t save_location;
     ShTownStage stage;
     int step;
     float timer;

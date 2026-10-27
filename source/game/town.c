@@ -1307,6 +1307,12 @@ static void school_events_update(ShTown *t, ShSavegame *save, float px, float pz
             begin_load_overlay(t, event, save->map_idx);
             return;
         }
+        if (event->sys_state == SH_SYS_SAVE_MENU0 || event->sys_state == SH_SYS_SAVE_MENU1) {
+            t->save_requested = true;
+            t->save_location = event->event_param;
+            t->controls_locked = true;
+            return;
+        }
         if (event->sys_state == SH_SYS_EVENT_SET_FLAG) {
             if (event->complete_flag > 0) {
                 sh_save_event_set(save, (unsigned)event->complete_flag);

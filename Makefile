@@ -25,7 +25,8 @@ CFLAGS	:=	-g -Wall -O2 -mword-relocations \
 			-ffunction-sections \
 			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -D__3DS__ -DSH3DS_TARGET_OLD3DS=1
+DEVELOPMENT ?= 0
+CFLAGS	+=	$(INCLUDE) -D__3DS__ -DSH3DS_TARGET_OLD3DS=1 -DSH3DS_DEVELOPMENT=$(DEVELOPMENT)
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS	:=	-g $(ARCH)

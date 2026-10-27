@@ -123,10 +123,8 @@ void sd_port_free_files(void)
 
 /* ---- XA ------------------------------------------------------------------ */
 
-static bool xa_read_clip(s32 xa_idx, XaClip *out)
+static bool xa_read_clip_path(const char *path, XaClip *out)
 {
-    char path[256];
-    snprintf(path, sizeof(path), "%s/%03d.xac", s_xa_root, (int)xa_idx);
     u32 size = 0;
     u8 *raw = read_whole(path, &size);
     if (!raw || size < 8 || memcmp(raw, "XAC1", 4) != 0) {
@@ -142,6 +140,13 @@ static bool xa_read_clip(s32 xa_idx, XaClip *out)
     out->sectors = sectors;
     out->coding = raw[6];
     return true;
+}
+
+static bool xa_read_clip(s32 xa_idx, XaClip *out)
+{
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%03d.xac", s_xa_root, (int)xa_idx);
+    return xa_read_clip_path(path, out);
 }
 
 void sd_port_service(SdLockFn lock, SdLockFn unlock)
@@ -280,6 +285,26 @@ static void xa_start(void)
 bool sd_port_xa_playing(void)
 {
     return s_xa_playing;
+}
+
+bool sd_port_movie_begin(const char *path, SdLockFn lock, SdLockFn unlock)
+{
+    XaClip clip = {0};
+    if (!xa_read_clip_path(path, &clip)) { return false; }
+    lock();
+    u8 *old = s_xa.data;
+    s_xa = clip;
+    s_xa_request = -1;
+    s_xa_loaded = s_xa_selected = -2;
+    xa_start();
+    unlock();
+    free(old);
+    return true;
+}
+
+void sd_port_movie_end(void)
+{
+    s_xa_playing = false;
 }
 
 /* ---- libcd / libetc ------------------------------------------------------ */

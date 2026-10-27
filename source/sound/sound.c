@@ -78,6 +78,26 @@ void sh_sound_render(int16_t *dst, int frames)
     unlock();
 }
 
+/* stream.c movie_main: preserve original XA decoding and serial volume. */
+bool sh_sound_movie_begin(const char *path)
+{
+    if (!s_ready || !sd_port_movie_begin(path, lock, unlock)) { return false; }
+    lock();
+    SsSetSerialAttr(0, 0, 1);
+    SsSetSerialVol(0, 80, 80);
+    unlock();
+    return true;
+}
+
+void sh_sound_movie_end(void)
+{
+    if (!s_ready) { return; }
+    lock();
+    SsSetSerialVol(0, 0, 0);
+    sd_port_movie_end();
+    unlock();
+}
+
 #ifdef __3DS__
 static void ndsp_callback(void *data)
 {

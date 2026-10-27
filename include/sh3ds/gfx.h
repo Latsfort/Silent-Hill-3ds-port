@@ -24,7 +24,7 @@ typedef struct ShCamera {
     float pos[3]; /* meters, Y up */
     float yaw;    /* radians, 0 looks toward -Z */
     float pitch;  /* radians, positive looks up */
-    float fov_deg; /* vertical FOV; <= 0 = default 48° */
+    float fov_deg; /* vertical FOV; <= 0 = retail gameplay default 53.13 degrees */
 } ShCamera;
 
 bool sh_gfx_init(void);
@@ -45,6 +45,7 @@ void sh_gfx_set_image_crop(const ShTim *tim, int sx, int sy, int sw, int sh);
 
 /* Draw the current image fitted to the top screen, with text on the bottom screen. */
 void sh_gfx_draw_viewer(const char *title, const char *info, const char *hint);
+void sh_gfx_draw_movie(const ShTim *frame, uint32_t revision);
 
 /*
  * Two map vertex buffers in linear memory, allocated once: the front one is
@@ -87,7 +88,7 @@ bool sh_gfx_set_player_tim(const ShTim *tim, const unsigned *clut_deltas, int co
 bool sh_gfx_set_player_clut_atlas(const ShTim *hero, const ShTim *held, const ShCharaClutMap *map);
 
 /* NPC / cutscene actor slots (Air Screamer, Cybil…). */
-#define SH_GFX_MAX_ACTORS 3 /* Cheryl + 2, or 3 Grey Children (MapEvent_GreyChildrenSpawn) */
+#define SH_GFX_MAX_ACTORS 6 /* bodyprog/chara/chara.h NPC_COUNT_MAX */
 #define SH_GFX_ACTOR_MAX_VERTS (900 * 3)
 bool sh_gfx_actor_set_mesh(int slot, const ShMapVertex *verts, size_t count);
 /* Upload a character TIM into the actor's 512x256 atlas (256x128 sheets, <=4 CLUT slots). */

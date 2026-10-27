@@ -1,4 +1,5 @@
 #include "sh3ds/game.h"
+#include "sh3ds/autotest.h"
 #include "sh3ds/assets.h"
 #include "sh3ds/cafe.h"
 #include "sh3ds/chara.h"
@@ -32,6 +33,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static bool development_enabled(void)
+{
+    return SH3DS_DEVELOPMENT != 0 || sh_autotest_active();
+}
 
 /*
  * Mapping note (reference only — see vendor/silent-hill-decomp):
@@ -1878,6 +1884,83 @@ static void start_debug_checkpoint(ShGame *game, int index)
         sh_school_map_room_idx(arrival.map, arrival.x, arrival.z) : 0;
 }
 
+static bool restore_savegame(ShGame *game, const ShAutosave *snapshot)
+{
+    const uint8_t map = (uint8_t)snapshot->save.map_idx;
+    if (!snapshot->valid || (map != SH_MAP_IDX_MAP0_S01 && map != SH_MAP_IDX_MAP0_S02 &&
+        map != SH_MAP_IDX_MAP2_S00 && !sh_school_map_is_school(map))) { return false; }
+    const ShAutosave restored = *snapshot;
+    const float x = SH_Q12_TO_FLOAT(restored.position[0]);
+    const float y = -SH_Q12_TO_FLOAT(restored.position[1]);
+    const float z = -SH_Q12_TO_FLOAT(restored.position[2]);
+    const float yaw = -(float)restored.yaw * (6.28318530717958647692f / 4096.0f);
+    boot_thr_at(game, x, z, 5);
+    game->save = restored.save;
+    if (map == SH_MAP_IDX_MAP0_S01) {
+        load_npcs_cafe();
+        sh_cafe_begin_explore(&game->cafe, &game->save);
+        game->cafe.got_text = NULL;
+        game->cafe.got_time = 0.0f;
+    } else {
+        load_npcs_town();
+        sh_town_begin_explore_at(&game->town, &game->save, x, z, yaw);
+        game->save = restored.save;
+        game->town.overlay_sys_state = SH_SYS_LOAD_OVERLAY;
+        game->town.overlay_map_idx = map;
+        game->town.overlay_x = x;
+        game->town.overlay_z = z;
+        game->town.overlay_yaw = yaw;
+        town_overlay_transition(game);
+        if (map == SH_MAP_IDX_MAP2_S00 && sh_save_event_get(&restored.save, 159)) {
+            sh_env_set(&game->town.environment, 6, 3);
+        }
+    }
+    game->save = restored.save;
+    game->player_pos[0] = x;
+    game->player_pos[1] = y;
+    game->player_pos[2] = z;
+    game->player_yaw = yaw;
+    update_chase_camera(game);
+    sh_save_autosave_set(&game->save, restored.position[0], restored.position[1], restored.position[2], restored.yaw);
+    game->phase = SH_PHASE_LOADING;
+    return true;
+}
+
+static void open_save_menu(ShGame *game, bool writing)
+{
+    ShAutosave snapshot = {0};
+    if (writing) {
+        snapshot.save = game->save;
+        snapshot.position[0] = SH_Q12(game->player_pos[0]);
+        snapshot.position[1] = SH_Q12(-game->player_pos[1]);
+        snapshot.position[2] = SH_Q12(-game->player_pos[2]);
+        snapshot.yaw = (int16_t)SH_Q12(-game->player_yaw / 6.28318530717958647692f);
+        snapshot.valid = true;
+    }
+    game->save_return_phase = game->phase;
+    sh_save_menu_begin(&game->save_menu, writing, writing ? &snapshot : NULL, "sdmc:");
+    sh_snd_stop(SH_SFX_RADIO_INTERFERENCE);
+    game->radio.noise_on = false;
+    game->phase = SH_PHASE_SAVE;
+}
+
+static void open_movie(ShGame *game, unsigned movie)
+{
+    char video[80], audio[80];
+    snprintf(video, sizeof(video), "romfs:/game/movie/%03u.shv", movie);
+    snprintf(audio, sizeof(audio), "romfs:/game/movie/%03u.xac", movie);
+    game->alley.movie_requested = false;
+    if (!sh_movie_open(&game->movie, video) || !sh_sound_movie_begin(audio)) {
+        sh_movie_close(&game->movie);
+        sh_assets_log("movie %u load failed", movie);
+        game->load_error = "Les ressources ne sont plus lisibles.\nFerme le jeu puis relance-le.\nDiagnostic SD : sh3ds_load.log";
+        game->phase = SH_PHASE_LOADING;
+        return;
+    }
+    game->movie_start_ms = osGetTime();
+    game->phase = SH_PHASE_MOVIE;
+}
+
 /* Alley finished → hand off to cafe cutscene (stay black through the load). */
 static void alley_to_cafe(ShGame *game)
 {
@@ -2333,6 +2416,24 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
     bool cafe_lock = false;
     bool map_open = sh_cafe_map_open(&game->cafe) || sh_town_map_open(&game->town);
 
+    if (game->alley.room_ready) {
+        const int cx = (int)floorf(game->alley.room_x / SH_CHUNK_METERS);
+        const int cz = (int)floorf(-game->alley.room_z / SH_CHUNK_METERS);
+        load_area_ex(game, game->area_index, cx, cz, 5);
+        game->player_pos[0] = game->alley.room_x;
+        game->player_pos[1] = 0.0f;
+        game->player_pos[2] = game->alley.room_z;
+        game->player_yaw = game->alley.room_yaw;
+        game->alley.room_ready = false;
+        game->alley.stage = SH_ALLEY_ROAM;
+        game->alley.need_ground_snap = true;
+        game->alley.fade_target = 0.0f;
+        game->alley.fade_speed = 3.0f;
+        window_job_start(game, cx, cz);
+        game->phase = SH_PHASE_LOADING;
+        return;
+    }
+
     if (sh_alley_go_to_cafe(&game->alley)) {
         alley_to_cafe(game);
         return;
@@ -2395,6 +2496,10 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
         cafe_lock =
             sh_alley_update(&game->alley, &game->save, &game->player_pos[0], &game->player_pos[1], &game->player_pos[2],
                             &game->player_yaw, input, dt);
+        if (game->alley.movie_requested) {
+            open_movie(game, 16);
+            return;
+        }
         if (sh_alley_needs_grey_assets(&game->alley)) {
             load_npcs_alley_grey();
             sh_alley_clear_grey_assets_flag(&game->alley);
@@ -2472,6 +2577,14 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
         }
     }
 
+    if (game->cafe.save_requested || game->town.save_requested) {
+        game->save.location_id = game->cafe.save_requested ? game->cafe.save_location : game->town.save_location;
+        game->cafe.save_requested = false;
+        game->town.save_requested = false;
+        open_save_menu(game, true);
+        return;
+    }
+
     const bool aiming = !alley_active && (sh_cafe_aiming(&game->cafe) || sh_town_aiming(&game->town));
 
     /* SysState_Gameplay_Update gives map events priority over the status menu. */
@@ -2533,7 +2646,7 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
         game->player_yaw -= turn * SH_TURN_SPEED * 1.4f * dt;
 
         /* Debug noclip: START+L+R */
-        if (sh_input_held(input, KEY_START) && sh_input_held(input, KEY_L) && sh_input_held(input, KEY_R) &&
+        if (development_enabled() && sh_input_held(input, KEY_START) && sh_input_held(input, KEY_L) && sh_input_held(input, KEY_R) &&
             (sh_input_down(input, KEY_L) || sh_input_down(input, KEY_R))) {
             game->noclip = !game->noclip;
         }
@@ -2636,7 +2749,9 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
     game->camera.fov_deg = 0.0f;
     {
         ShCamera cut;
-        if (sh_alley_camera(&game->alley, &cut)) {
+        const bool alley_camera = sh_alley_gameplay_camera(&game->alley, game->player_pos,
+                                                          game->player_yaw, dt, &cut);
+        if (sh_alley_camera(&game->alley, &cut) || alley_camera) {
             game->camera = cut;
         } else if (sh_town_camera(&game->town, &cut)) {
             game->camera = cut;
@@ -2655,7 +2770,7 @@ static void update_map(ShGame *game, const ShInputState *input, float dt)
     const bool town_active = sh_town_active(&game->town);
 
     /* Debug area hopping disabled during alley / cafe / town scripts. */
-    if (!cafe_active && !alley_active && !town_active) {
+    if (development_enabled() && !cafe_active && !alley_active && !town_active) {
         if (sh_input_down(input, KEY_DRIGHT)) {
             load_area(game, game->area_index + 1);
         } else if (sh_input_down(input, KEY_DLEFT)) {
@@ -2681,6 +2796,7 @@ static void update_map(ShGame *game, const ShInputState *input, float dt)
     }
 
     update_player(game, input, dt);
+    if (game->phase != SH_PHASE_MAP) { return; }
     if (game->save.map_idx == SH_MAP_IDX_MAP1_S03 && sh_school_roof_water(&game->town)) {
         if (!game->water_ready) { game->water_ready = load_water_atlas(); }
         if (!game->water_ready) {
@@ -2766,6 +2882,10 @@ void sh_game_shutdown(ShGame *game)
     if (!game) {
         return;
     }
+    if (game->movie.file) {
+        sh_sound_movie_end();
+        sh_movie_close(&game->movie);
+    }
     sh_arena_reset(sh_memory_level_arena());
     sh_arena_reset(sh_memory_frame_arena());
     game->phase = SH_PHASE_EXIT;
@@ -2809,7 +2929,7 @@ void sh_game_update(ShGame *game, const ShInputState *input)
     game->frame++;
     sh_bgm_frame_begin();
 
-    if ((game->phase == SH_PHASE_MAP || game->phase == SH_PHASE_LOADING ||
+    if (development_enabled() && (game->phase == SH_PHASE_MAP || game->phase == SH_PHASE_LOADING ||
          game->phase == SH_PHASE_GAME_OVER) &&
         sh_input_held(input, KEY_START) && sh_input_held(input, KEY_SELECT) &&
         sh_input_down(input, KEY_START | KEY_SELECT)) {
@@ -2818,7 +2938,8 @@ void sh_game_update(ShGame *game, const ShInputState *input)
     }
 
     /* SELECT quits from menus; in map mode it uses a health item instead. */
-    if (sh_input_down(input, KEY_SELECT) && game->phase != SH_PHASE_MAP) {
+    if (sh_input_down(input, KEY_SELECT) && game->phase != SH_PHASE_MAP && game->phase != SH_PHASE_SAVE &&
+        game->phase != SH_PHASE_MOVIE) {
         game->wants_exit = true;
         game->phase = SH_PHASE_EXIT;
         return;
@@ -2831,12 +2952,16 @@ void sh_game_update(ShGame *game, const ShInputState *input)
         }
         break;
     case SH_PHASE_TITLE: {
-        const int title_count = 9 + sh_debug_checkpoint_count();
+        const int title_count = development_enabled() ? 10 + sh_debug_checkpoint_count() : 2;
         if (sh_input_down(input, KEY_DUP)) {
             game->title_sel = (game->title_sel + title_count - 1) % title_count;
         } else if (sh_input_down(input, KEY_DDOWN)) {
             game->title_sel = (game->title_sel + 1) % title_count;
         } else if (sh_input_down(input, KEY_A) || sh_input_down(input, KEY_START)) {
+            if (game->title_sel == title_count - 1) {
+                open_save_menu(game, false);
+                break;
+            }
             switch (game->title_sel) {
             case 0:
                 start_new_game_full(game);
@@ -2869,7 +2994,7 @@ void sh_game_update(ShGame *game, const ShInputState *input)
                 start_debug_checkpoint(game, game->title_sel - 9);
                 break;
             }
-        } else if (sh_input_down(input, KEY_Y)) {
+        } else if (development_enabled() && sh_input_down(input, KEY_Y)) {
             game->phase = SH_PHASE_VIEWER;
             load_texture(game, game->texture_index);
         }
@@ -2901,6 +3026,41 @@ void sh_game_update(ShGame *game, const ShInputState *input)
             game->load_error = "La construction de la zone a echoue.\nRetourne au menu pour reessayer.";
         }
         break;
+    case SH_PHASE_MOVIE: {
+        const uint32_t elapsed = (uint32_t)(now - game->movie_start_ms);
+        if (sh_movie_step(&game->movie, elapsed, sh_input_down(input, SH_BTN_SKIP))) {
+            sh_sound_movie_end();
+            sh_movie_close(&game->movie);
+            if (game->movie.failed) {
+                sh_assets_log("movie frame read failed");
+                game->load_error = "Les ressources ne sont plus lisibles.\nFerme le jeu puis relance-le.\nDiagnostic SD : sh3ds_load.log";
+                game->phase = SH_PHASE_LOADING;
+            } else {
+                game->alley.movie_finished = true;
+                game->phase = SH_PHASE_MAP;
+            }
+        }
+        break;
+    }
+    case SH_PHASE_SAVE: {
+        sh_bgm_status_set(SH_BGM_STATUS_PAUSE);
+        const ShSaveMenuAction action = sh_save_menu_update(&game->save_menu, input, dt);
+        if (action == SH_SAVE_MENU_LOADED) {
+            if (!restore_savegame(game, &game->save_menu.snapshot)) {
+                game->save_menu.loaded = false;
+                game->save_menu.result = SH_SAVEFILE_INVALID;
+                game->save_menu.step = SH_SAVE_MENU_STATUS;
+            }
+        } else if (action == SH_SAVE_MENU_CLOSED) {
+            if (game->save_menu.writing && sh_save_event_get(&game->save_menu.snapshot.save, 186)) {
+                sh_save_event_set(&game->save, 186);
+            }
+            game->cafe.controls_locked = false;
+            game->town.controls_locked = false;
+            game->phase = game->save_return_phase;
+        }
+        break;
+    }
     case SH_PHASE_VIEWER:
         if (sh_input_down(input, KEY_START) || sh_input_down(input, KEY_B)) {
             game->phase = SH_PHASE_TITLE;
@@ -3267,6 +3427,11 @@ static void render_map(const ShGame *game)
             hud.hint = s_map_tim_ok ? "Y / B : close map" : "Y / B : fermer (map TIM absente)";
         }
     }
+    if (!development_enabled()) {
+        hud.title = inv_open ? title : "";
+        hud.info = inv_open ? info : alley_active ? alley_dlg : town_active ? town_dlg : cafe_dlg;
+        hud.hint = inv_open ? hint_buf : "";
+    }
     sh_gfx_draw_map(&game->camera, &player, actors, actor_count, &hud);
 }
 
@@ -3284,6 +3449,13 @@ void sh_game_render(const ShGame *game)
         sh_gfx_draw_boot_screen("SILENT HILL", "Welcome to Silent Hill...", line3);
         break;
     case SH_PHASE_TITLE: {
+        if (!development_enabled()) {
+            char menu[96];
+            snprintf(menu, sizeof(menu), "%c %s\n%c %s", game->title_sel == 0 ? '>' : ' ',
+                sh_save_title_label(2), game->title_sel == 1 ? '>' : ' ', sh_save_title_label(0));
+            sh_gfx_draw_title_screen("SILENT HILL", "", "", menu);
+            break;
+        }
         static const char *const opts[] = {
             "New Game (intro rue + Cheryl)",
             "Skip → Cafe (Cybil)",
@@ -3298,10 +3470,11 @@ void sh_game_render(const ShGame *game)
         char menu[600];
         size_t len = 0;
         const int base_count = (int)(sizeof(opts) / sizeof(opts[0]));
-        const int count = base_count + sh_debug_checkpoint_count();
+        const int count = base_count + sh_debug_checkpoint_count() + 1;
         const int first = game->title_sel >= 8 ? game->title_sel - 7 : 0;
         for (int i = first; i < count && i < first + 9; i++) {
-            const char *name = i < base_count ? opts[i] : sh_debug_checkpoint_name(i - base_count);
+            const char *name = i == count - 1 ? sh_save_title_label(0) :
+                i < base_count ? opts[i] : sh_debug_checkpoint_name(i - base_count);
             len += (size_t)snprintf(menu + len, sizeof(menu) - len, "%s%c %s", i > first ? "\n" : "",
                                     game->title_sel == i ? '>' : ' ', name);
         }
@@ -3322,6 +3495,15 @@ void sh_game_render(const ShGame *game)
     case SH_PHASE_MAP:
         render_map(game);
         break;
+    case SH_PHASE_MOVIE:
+        sh_gfx_draw_movie(&game->movie.image, game->movie.revision);
+        break;
+    case SH_PHASE_SAVE: {
+        char title[48], body[768];
+        sh_save_menu_format(&game->save_menu, title, sizeof(title), body, sizeof(body));
+        sh_gfx_draw_title_screen("SILENT HILL", title, "", body);
+        break;
+    }
     case SH_PHASE_GAME_OVER:
         sh_gfx_draw_title_screen("GAME OVER", "Harry is dead.",
                                  "A / START / B : title",

@@ -1,5 +1,46 @@
 # Porting handoff
 
+## Active user scope, 27 October 2026
+
+Correct the bugs and differences in `docs/bugs-et-differences.md`, starting from
+the opening. **Leave the school boss aside.** Keep credit usage restrained. The
+whole task is not complete: later story areas, combat, animation and several
+opening scenes remain incomplete. Do not claim a complete playthrough.
+
+Current corrections:
+- SD save/load connected to the cafe notebook and integrated SaveMenu events.
+  Transactional files, CRC, backup recovery, original labels/locations and two
+  cards of 165 entries. Native corruption/truncation/cross-process and menu tests
+  pass. Azahar Old 3DS notebook write and LOAD return to grounded cafe gameplay.
+  Format and menu rendering are port-specific; unsupported later maps cannot load.
+- Cafe held handgun fire corrected; knife remains per press. Native 30/60 Hz tests
+  pass. Full combat remains different from retail.
+- FMV16 now plays 119 original decoded frames, 320x208 at 15 fps, with original XA
+  packets (silent in the original file). `prepare_movie.py 16 --check`, native
+  video/audio tests and Old 3DS full/START-skip emulator runs pass. No hardware or
+  pixel fidelity claim. Local FFmpeg installation documented in README.
+- Normal builds hide development shortcuts/HUD and expose START/LOAD. The original
+  title/options, inventory and game-over presentation remain incomplete.
+- Renderer actor capacity raised to retail six; no six-character hardware test.
+- Fallback FOV corrected to 53.13, cafe aim zoom removed, alley look-at yaw fixed.
+- D15 expanded gate trigger removed. Original events/points generated, Q12 boundary
+  tests and a real IPD collision approach from the street pass.
+- Opening gameplay VC camera now uses MAP0_S00 roads. `gen_alley_camera.py` checks
+  every packed road field against the SHA1-verified overlay before emitting exact
+  Q4/Q8 values. Cutscene return/road selection tested at 30/60 Hz; emulator movie
+  return passes. Dynamic retail road changes still need investigation.
+- `make -j4` passes without compiler warnings. No console test.
+- Dormant Grey Children now use Stalker_Init keyframe477 until Nightmare activates
+  them, and are excluded from near-enemy VC selection before activation. Their
+  staging positions/headings are generated from both matching retail spawn sites.
+  Active combat/Cheryl animations still use the simplified loop and remain D16.
+
+Next opening work: preserve all original case numbers in GetsDarker and Nightmare,
+port state84 torch animation/flame and 6->10 environmental transition, load original
+corpse chunk override THRF908 at logical(-7,6), use head-bone camera, then integrate
+actual Grey Child combat and Harry death rather than A damage and 45-second timeout.
+Do not treat the present simplified messages or native backend checks as completion.
+
 Full goal remains active: port all scenes/progression/endings faithfully, then verify actual coverage. AGENTS.md applies. One agent; focused changes; reuse existing adapters/generators; user now authorizes make -j4 per coherent large block; run affected checks; do not claim hardware fidelity from native tests.
 
 ## Current verified state

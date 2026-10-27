@@ -3,6 +3,7 @@
 #include "sh3ds/fixed.h"
 #include "sh3ds/snd.h"
 #include "sh3ds/sound.h"
+#include "sh3ds/vc.h"
 
 #include <3ds.h>
 #include <math.h>
@@ -412,8 +413,7 @@ static void update_gameplay_camera(ShCafe *cafe, float px, float py, float pz, f
         cam_look_at(&cafe->cam, cafe->cam_watch[0], cafe->cam_watch[1], cafe->cam_watch[2]);
         cafe->cam.pitch = clampf(cafe->cam.pitch, DEG(-55.0f), DEG(18.0f));
     }
-    /* Mild aim zoom: PS1 mostly tightens camera, not a telephoto FOV. 40° ≈ slight pull-in. */
-    cafe->cam.fov_deg = cafe->aiming ? 40.0f : 48.0f;
+    cafe->cam.fov_deg = SH_VC_FOV_DEG;
 
     cafe->walk_yaw = cafe->cam.yaw;
     cafe->move_yaw = cafe->cam.yaw;
@@ -494,7 +494,7 @@ static void dms_camera(ShCafe *cafe, float frame)
     cafe->cam.yaw = atan2f(-dx, -dz);
     cafe->cam.pitch = horiz > 1e-4f ? atan2f(dy, horiz) : 0.0f;
     /* PS1 projection distance over a 240-line screen → vertical FOV. */
-    cafe->cam.fov_deg = pd > 20.0f ? 2.0f * atan2f(120.0f, pd) * (180.0f / PI_F) : 48.0f;
+    cafe->cam.fov_deg = pd > 20.0f ? 2.0f * atan2f(120.0f, pd) * (180.0f / PI_F) : SH_VC_FOV_DEG;
     cafe->cam_active = true;
     cafe->walk_yaw = cafe->cam.yaw;
     cafe->cam_road_idx = -1; /* DMS owns the view until gameplay picks a road again. */
@@ -715,8 +715,8 @@ void sh_cafe_begin_explore(ShCafe *cafe, ShSavegame *save)
     enter_explore(cafe);
     cafe->fade = 0.0f;
     cafe->fade_target = 0.0f;
-    cafe->got_text = "Skip: Cafe explore\nPick up knife, map, flashlight...";
-    cafe->got_time = 3.0f;
+    cafe->got_text = NULL;
+    cafe->got_time = 0.0f;
 }
 
 void sh_cafe_begin_bird_fight(ShCafe *cafe, ShSavegame *save)
@@ -761,7 +761,7 @@ void sh_cafe_begin_bird_fight(ShCafe *cafe, ShSavegame *save)
     cafe->bird_yaw = 0.0f;
     cafe->ammo = save ? sh_save_item_count(save, SH_ITEM_HANDGUN_BULLETS) : 15;
     cafe->radio = 0.95f;
-    cafe->got_text = "Skip: Air Screamer fight\nR : aim    A : shoot";
+    cafe->got_text = NULL;
     cafe->got_time = 3.0f;
 }
 
@@ -1655,15 +1655,17 @@ static void combat_update(ShCafe *cafe, ShSavegame *save, float px, float pz, fl
     const bool want_aim = !cafe->controls_locked && sh_input_held(input, SH_BTN_AIM);
     cafe->aiming = has_weapon && want_aim;
     if (want_aim && !has_weapon) {
-        cafe->combat_text = "SELECT : status → Equip weapon";
-        cafe->combat_text_time = 1.2f;
+        cafe->combat_text = NULL;
+        cafe->combat_text_time = 0.0f;
         return;
     }
-    if (!cafe->aiming || cafe->attack_cd > 0.0f || !sh_input_down(input, SH_BTN_ACTION)) {
+    /* Player_Controller: firearms use held action; melee uses the attack press. */
+    const bool gun = weapon == SH_ITEM_HANDGUN;
+    const bool attack = gun ? sh_input_held(input, SH_BTN_ACTION) : sh_input_down(input, SH_BTN_ACTION);
+    if (!cafe->aiming || cafe->attack_cd > 0.0f || !attack) {
         return;
     }
 
-    const bool gun = weapon == SH_ITEM_HANDGUN;
     const float harry[3] = {px, 0.0f, pz};
     if (gun) {
         cafe->ammo = sh_save_item_count(save, SH_ITEM_HANDGUN_BULLETS);
@@ -1978,9 +1980,13 @@ static bool cafe_events_button(ShCafe *cafe, ShSavegame *save, float *px, float 
             return true;
         }
     }
-    /* [16] notebook on the counter (save point [17] not ported) */
-    if (ev50 && trig_obb_facing(10, x, z, a)) {
-        open_read(cafe, 75);
+    /* MAP_EVENTS[16]/[17]: the read-message event precedes the save event. */
+    if (trig_obb_facing(10, x, z, a)) {
+        if (ev50) { open_read(cafe, 75); }
+        else {
+            cafe->save_requested = true;
+            cafe->save_location = 1;
+        }
         return true;
     }
     /* [18]..[21] pinball machines, TV */
@@ -2085,8 +2091,8 @@ bool sh_cafe_update(ShCafe *cafe, ShSavegame *save, float *player_x, float *play
         cafe->controls_locked = true;
         cafe->aiming = false;
         cafe->fire_anim = 0.0f;
-        cafe->combat_text = "Harry collapsed...";
-        cafe->combat_text_time = 1.0f;
+        cafe->combat_text = NULL;
+        cafe->combat_text_time = 0.0f;
         if (cafe->die_timer >= 2.5f && fade_done(cafe) && cafe->fade >= 0.99f) {
             cafe->game_over = true;
         }
@@ -2560,10 +2566,8 @@ void sh_cafe_cycle_weapon(ShCafe *cafe, ShSavegame *save)
     } else if (knife) {
         save->equipped_weapon = SH_ITEM_POCKET_KNIFE;
     }
-    cafe->got_text = save->equipped_weapon == SH_ITEM_HANDGUN      ? "Equipped: Handgun"
-                     : save->equipped_weapon == SH_ITEM_POCKET_KNIFE ? "Equipped: Kitchen knife"
-                                                                     : "Unequipped";
-    cafe->got_time = 1.4f;
+    cafe->got_text = NULL;
+    cafe->got_time = 0.0f;
     cafe->combat_text = cafe->got_text;
     cafe->combat_text_time = 1.4f;
 }
@@ -2583,7 +2587,7 @@ void sh_cafe_toggle_map(ShCafe *cafe, const ShSavegame *save)
     }
     cafe->map_open = !cafe->map_open;
     if (cafe->map_open) {
-        cafe->got_text = "Residential area map\nY / B : close";
+        cafe->got_text = NULL;
         cafe->got_time = 2.0f;
     }
 }

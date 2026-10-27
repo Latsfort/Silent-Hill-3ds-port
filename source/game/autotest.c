@@ -202,6 +202,16 @@ void sh_autotest_log(ShGame *g)
             sh_cafe_map_open(&g->cafe) || sh_town_map_open(&g->town),
             sh_save_health_f(&g->save), SH_Q12_TO_FLOAT(g->save.health_saturation),
             g->radio.intensity, g->radio.powered, g->radio.noise_on);
+    if (g->phase == SH_PHASE_SAVE) {
+        fprintf(s_log, "save_menu step=%d writing=%d result=%d card=%u entry=%u loaded=%d\n",
+            g->save_menu.step, g->save_menu.writing, g->save_menu.result, g->save_menu.card,
+            g->save_menu.entry, g->save_menu.loaded);
+    }
+    if (g->phase == SH_PHASE_MOVIE) {
+        fprintf(s_log, "movie frame=%u count=%u size=%dx%d fps=%u/%u failed=%d\n",
+            (unsigned)g->movie.frame_index, (unsigned)g->movie.frame_count, g->movie.image.width, g->movie.image.height,
+            (unsigned)g->movie.fps_num, (unsigned)g->movie.fps_den, g->movie.failed);
+    }
     if (g->save.map_idx == SH_MAP_IDX_MAP1_S00 || g->save.map_idx == SH_MAP_IDX_MAP1_S01) {
         fprintf(s_log, "area=%s school=%d/%d image=%s shade=%u objects=%d mask=%u\n", g->area_names[g->area_index],
                 g->town.school.callback, g->town.school.substep,

@@ -12,8 +12,10 @@
 #include "sh3ds/input.h"
 #include "sh3ds/inventory.h"
 #include "sh3ds/maptex.h"
+#include "sh3ds/movie.h"
 #include "sh3ds/radio.h"
 #include "sh3ds/savegame.h"
+#include "sh3ds/save_menu.h"
 #include "sh3ds/tim.h"
 
 #ifdef __cplusplus
@@ -41,6 +43,8 @@ typedef enum ShGamePhase {
     SH_PHASE_MAP,
     SH_PHASE_GAME_OVER, /* Harry at 0 HP — fade then back to title */
     SH_PHASE_VIEWER, /* debug TIM browser — not the main path */
+    SH_PHASE_SAVE,
+    SH_PHASE_MOVIE,
     SH_PHASE_EXIT
 } ShGamePhase;
 
@@ -128,6 +132,10 @@ typedef struct ShGame {
     ShCafe cafe;
     ShTown town;
     ShInventory inventory;
+    ShSaveMenu save_menu;
+    ShGamePhase save_return_phase;
+    ShMovie movie;
+    uint64_t movie_start_ms;
     int title_sel;
     float radio_time; /* seconds, for static pulse */
     bool noclip; /* L+R together toggles; when off, walk on IPD collision */

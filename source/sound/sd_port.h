@@ -15,3 +15,5 @@ bool sd_port_load_file(s32 idx);
 void sd_port_service(SdLockFn lock, SdLockFn unlock);
 void sd_port_free_files(void);
 bool sd_port_xa_playing(void);
+bool sd_port_movie_begin(const char *path, SdLockFn lock, SdLockFn unlock);
+void sd_port_movie_end(void);

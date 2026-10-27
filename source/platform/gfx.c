@@ -1,4 +1,5 @@
 #include "sh3ds/gfx.h"
+#include "sh3ds/vc.h"
 #include "sh3ds/choice.h"
 #include "sh3ds/chara.h"
 #include "sh3ds/config.h"
@@ -792,6 +793,27 @@ void sh_gfx_draw_viewer(const char *title, const char *info, const char *hint)
     draw_text_line(16.0f, 200.0f, 0.4f, hint, muted);
 }
 
+void sh_gfx_draw_movie(const ShTim *frame, uint32_t revision)
+{
+    static uint32_t last_revision = UINT32_MAX;
+    if (revision != last_revision || s_uploaded != frame) {
+        s_pending = frame;
+        s_img_crop_x = s_img_crop_y = s_img_crop_w = s_img_crop_h = 0;
+        upload_pending_image();
+        last_revision = revision;
+    }
+    const u32 black = C2D_Color32(0, 0, 0, 255);
+    C2D_TargetClear(s_top, black);
+    C2D_SceneBegin(s_top);
+    if (s_has_image) {
+        const C2D_Image image = {&s_tex, &s_subtex};
+        C2D_DrawImageAt(image, (SH3DS_TOP_WIDTH - frame->width) * 0.5f,
+            (SH3DS_TOP_HEIGHT - frame->height) * 0.5f, 0.5f, NULL, 1.0f, 1.0f);
+    }
+    C2D_TargetClear(s_bottom, black);
+    C2D_SceneBegin(s_bottom);
+}
+
 ShMapVertex *sh_gfx_map_back_storage(size_t *capacity)
 {
     ShMapVertex *back = s_map_vbo[s_map_front ^ 1];
@@ -1399,8 +1421,7 @@ static void draw_map_geometry(const ShCamera *camera, const ShPlayerPose *player
 
     C3D_Mtx projection;
     C3D_Mtx view;
-    /* Narrower than the free-cam 62°: third-person reads closer to PS1 Silent Hill. */
-    const float fov = camera->fov_deg > 10.0f && camera->fov_deg < 140.0f ? camera->fov_deg : 48.0f;
+    const float fov = camera->fov_deg > 10.0f && camera->fov_deg < 140.0f ? camera->fov_deg : SH_VC_FOV_DEG;
     Mtx_PerspTilt(&projection, C3D_AngleFromDegrees(fov), C3D_AspectRatioTop, SH_MAP_NEAR, SH_MAP_FAR, false);
     Mtx_Identity(&view);
     Mtx_RotateX(&view, -camera->pitch, true);

@@ -51,6 +51,8 @@ typedef struct ShMapEvent {
 #define SH_SYS_LOAD_OVERLAY 5
 #define SH_SYS_LOAD_ROOM 6
 #define SH_SYS_READ_MESSAGE 7
+#define SH_SYS_SAVE_MENU0 8
+#define SH_SYS_SAVE_MENU1 9
 #define SH_SYS_EVENT_CALLBACK 10
 #define SH_SYS_EVENT_SET_FLAG 11
 

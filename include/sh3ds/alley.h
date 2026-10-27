@@ -8,6 +8,7 @@
 #include "sh3ds/gfx.h"
 #include "sh3ds/input.h"
 #include "sh3ds/savegame.h"
+#include "sh3ds/vc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +50,7 @@ typedef enum ShAlleyStage {
     SH_ALLEY_FIGHT,     /* Grey Children after EventFlag_17 */
     SH_ALLEY_NIGHTMARE, /* MapEvent_CutsceneAlleyNightmare → blackout */
     SH_ALLEY_BLACKOUT,  /* hold black, stop SFX, hand off to cafe */
+    SH_ALLEY_ROOM,
     SH_ALLEY_TO_CAFE
 } ShAlleyStage;
 
@@ -69,9 +71,18 @@ typedef struct ShAlley {
     float fade;
     float fade_target;
     float fade_speed;
+    int32_t darkness;
+    float room_x, room_z, room_yaw;
+    uint16_t room_complete_flag;
+    bool room_ready;
+    bool redirected;
+    bool movie_requested;
+    bool movie_finished;
 
     bool cam_active;
     ShCamera cam;
+    ShVc vc;
+    bool vc_scripted;
 
     bool cheryl_visible;
     float cheryl_pos[3];
@@ -127,6 +138,7 @@ const char *sh_alley_hint(const ShAlley *alley);
 bool sh_alley_letterbox(const ShAlley *alley);
 float sh_alley_fade(const ShAlley *alley);
 bool sh_alley_camera(const ShAlley *alley, ShCamera *out);
+bool sh_alley_gameplay_camera(ShAlley *alley, const float position[3], float yaw, float dt, ShCamera *out);
 
 bool sh_alley_actor_pose(const ShAlley *alley, int slot, ShActorPose *out);
 int sh_alley_actor_keyframe(const ShAlley *alley, int slot, int kf_count);

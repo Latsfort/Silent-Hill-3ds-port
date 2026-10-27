@@ -94,6 +94,10 @@ $xaCmds = @(
 & build\xa_extract.exe dump\assets\XA romfs\game\xa @xaCmds
 if ($LASTEXITCODE -ne 0) { throw "xa_extract failed" }
 
+# SysState_Fmv 16: original STR video and unmodified XA audio packets.
+& python tools\prepare_movie.py 16
+if ($LASTEXITCODE -ne 0) { throw 'Movie preparation failed. Install FFmpeg or imageio-ffmpeg in build/video-tools.' }
+
 $textures = (Get-ChildItem romfs\game\tim -Filter *.TIM).Count
 $chunks = (Get-ChildItem romfs\game\bg -Filter *.IPD).Count
 $charaN = (Get-ChildItem romfs\game\chara -Filter *.ILM).Count
