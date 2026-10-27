@@ -135,8 +135,11 @@ Le chargement de FLAME.TIM, les tirages aléatoires et couleurs d'origine, les q
 coins, le suivi de la main, la cadence de 30 Hz et la transparence sont intégrés.
 Le parcours Old 3DS vérifie maintenant la texture chargée et six sommets transmis
 au rendu ; l'éclairage utilise aussi le préréglage courant de la ruelle.
-Restent le scintillement d'environnement `func_800DD0CC` et la comparaison visuelle
-avec le retail. La projection utilise encore la caméra du port, sans preuve de
+Le scintillement d'environnement `func_800DD0CC` est maintenant intégré, y compris
+ses phases signées sur 16 bits, les trois demandes de hasard et la transition
+vers le préréglage 6. Les tests natifs passent à 30/60 Hz ; le parcours Old 3DS
+confirme que l'intensité varie tout en conservant la flamme au rendu.
+Reste la comparaison visuelle avec le retail. La projection utilise encore la caméra du port, sans preuve de
 parité avec les arrondis/saturations du RTPS matériel PS1. La capture visuelle a
 échoué avec « Computer Use app approval timed out » : aucun placement à l'écran
 ni résultat sur console n'est déclaré vérifié.

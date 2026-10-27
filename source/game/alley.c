@@ -335,6 +335,7 @@ void sh_alley_reset(ShAlley *alley)
     voice_stop(alley);
     memset(alley, 0, sizeof(*alley));
     alley->darkness = -1;
+    sh_alley_flicker_init(&alley->flicker);
     alley->stage = SH_ALLEY_OFF;
     alley->timer = -1.0f;
     sh_vc_init(&alley->vc, s_alley_camera_roads,
@@ -1164,6 +1165,9 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         }
         ShAnimPoseTiming pose;
         sh_path_animation_timing(&alley->torch_player, SH_Q12(dt), 0, 0, &pose);
+    }
+    if (sh_save_event_get(save, SH_EV_ALLEY_DARK)) {
+        sh_alley_flicker_update(&alley->flicker, &alley->environment, SH_Q12(dt));
     }
     sh_env_update(&alley->environment, sh_save_flashlight_on(save), dt);
     return alley->controls_locked;

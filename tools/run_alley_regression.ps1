@@ -46,6 +46,9 @@ try {
             if ($log -notmatch 'alley=10/11 torch=1/1 kf=993') { throw 'Final torch pose and second message were not reached.' }
             if ($log -notmatch 'alley=9/0 torch=0/1 .*flags=11111') { throw 'Scene did not return control with original flags.' }
             if ($log -notmatch 'flame ready=1 visible=1 vertices=6') { throw 'Lighter texture/geometry did not reach the renderer.' }
+            $flicker = [regex]::Matches($log, 'flame ready=1 visible=1 vertices=6[^\r\n]*flicker=(\d+) spot=(\d+)')
+            $values = @($flicker | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+            if ($values.Count -lt 2) { throw 'Lighter environment flicker did not vary in gameplay.' }
             Write-Output 'PASS: Old 3DS alley doors, darkness messages, rendered torch animation and return to gameplay.'
             $completed = $true
             break

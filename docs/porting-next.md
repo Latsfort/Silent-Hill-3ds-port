@@ -137,6 +137,31 @@ timers and invokes Rng_GenerateUInt32..95/32..63 (macro uses RNG16 % range).
 Its vecs[0] is intentionally overwritten after an early branch; preserve RNG order.
 Original flicker runs while flag17 is set, including the final modal message.
 
+Flicker continuation: now integrated via alley_flicker.h/c and generated
+alley_flicker_data.h. Generator validates ROM SHA1 and extracts all initial fields,
+then adapts the complete func_800DD0CC, preserving signed16 phase fields, uint8
+rates, overwritten intermediate, exact RNG16 range macro and transition6/6.
+ShAlley reset initializes its overlay state; update runs whenever flag17 is set,
+including case11's modal message. Native tests pass5000 frames at both68/136
+Q12 deltas, source initial light, phase ranges and exactly3 RNG requests when
+both source branches fire. Full alley native progression and make pass.
+Old3DS emulator PASS with source flicker varying alongside rendered flame:
+final value29440, spot1901, ambient129, flame6 vertices, original flags13..17.
+Native alley regression link must now include alley_flicker.c and rng.c.
+
+Next source lookup for D12 already verified: WorldMap_ChunkSet(FILE_BG_THRF908_IPD,
+-7,6) invalidates/reloads the logical chunk; func_80044044 relocates ipd->chunkX/Z
+and adjusts collisionData.positionX/Z by delta*Q8(CHUNK_SIZE). THRF908 raw IPD
+header/collision origin is(-7,8),(-71680,81920), so relocating to6 shifts PS1Z
+by-80m. sh_map_add_ipd currently uses header bytes2/3 for rendering and coll.c uses
+collision origin0x54. Must relocate BOTH, preserving original inst transforms.
+Do not merely rename file coords or leave collision at the original location.
+Next inspect original MAP_INFOS grid to confirm which original logical file is
+replaced, then add relocation + live override/request, followed by the original
+Nightmare cases0..4, two player waypoints, head-bone camera and model visibility.
+No boss work. GitHub99efee9 and the new flicker changes remain pending the user's
+requested broader publication approval; do not retry rejected push without it.
+
 Full goal remains active: port all scenes/progression/endings faithfully, then verify actual coverage. AGENTS.md applies. One agent; focused changes; reuse existing adapters/generators; user now authorizes make -j4 per coherent large block; run affected checks; do not claim hardware fidelity from native tests.
 
 ## Current verified state

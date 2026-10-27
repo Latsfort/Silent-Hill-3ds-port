@@ -12,6 +12,7 @@
 #include "sh3ds/path.h"
 #include "sh3ds/border.h"
 #include "sh3ds/environment.h"
+#include "sh3ds/alley_flicker.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,6 +77,7 @@ typedef struct ShAlley {
     float fade_speed;
     int32_t darkness;
     ShEnvironment environment;
+    ShAlleyFlicker flicker;
     ShBorder border;
     ShPathPlayer torch_player;
     int32_t torch_environment_time;
