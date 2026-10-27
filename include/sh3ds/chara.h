@@ -70,7 +70,9 @@ typedef enum ShCharaFlags {
     SH_CHARA_F_HARRY_GUN = 1 << 1,   /* handgun: 06LHAND + 10RHAND3 */
     SH_CHARA_F_HARRY_KNIFE = 1 << 2, /* kitchen knife: 06LHAND2 + 10RHAND2 */
     SH_CHARA_F_SPLIT_HEAD_1 = 1 << 3,
-    SH_CHARA_F_SPLIT_HEAD_2 = 1 << 4
+    SH_CHARA_F_SPLIT_HEAD_2 = 1 << 4,
+    SH_CHARA_F_HARRY_MATCH_HAND = 1 << 5,
+    SH_CHARA_F_HARRY_MATCH_ARM = 1 << 6
 } ShCharaFlags;
 
 #define SH_CHARA_MAX_BONES 32

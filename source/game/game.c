@@ -440,6 +440,10 @@ static ShEnvLight s_environment_light;
 
 static unsigned harry_hand_flags(const ShGame *game)
 {
+    if (sh_alley_active(&game->alley) && game->alley.torch_match) {
+        return SH_CHARA_F_HARRY_HANDS | SH_CHARA_F_HARRY_MATCH_HAND |
+            (game->alley.torch_active ? 0 : SH_CHARA_F_HARRY_MATCH_ARM);
+    }
     if (game->town.stage == SH_TOWN_SCRIPT && game->town.script == SH_TOWN_SCR_SCHOOL &&
           (game->town.harry_state == 83 || game->town.harry_state == 87 || game->town.harry_state == 88 ||
            game->town.school.empty_hand)) {

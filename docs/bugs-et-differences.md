@@ -127,8 +127,12 @@ le trajet pilote le préréglage 6. Les deux messages attendent A et le drapeau 
 est posé à l'étape 11. Ces points passent les tests natifs à 30/60 Hz ; la compilation
 est sans avertissement. Dans Azahar Old 3DS, le scénario parcourt les deux portes,
 atteint les images 980 à 993 de Harry et revient en jeu après les deux messages.
-Le dessin et le chargement de la flamme, la pose du bras après allumage et la
-comparaison visuelle avec le retail sur émulateur/console restent à terminer.
+La pose du bras après allumage et la main droite fermée sont maintenant intégrées.
+Les trois matrices sont produites par exécution de la routine MIPS/GTE du retail ;
+les 568 images de base de Harry passent les tests de géométrie, d'ancrage de
+l'épaule, de conservation du bras gauche et de désactivation de l'effet.
+Le dessin et le chargement de la flamme ainsi que la comparaison visuelle avec le
+retail sur émulateur/console restent à terminer.
 Sources : `SH_ALLEY_DARKER` dans [alley.c](../source/game/alley.c),
 `MapEven_CutsceneAlleyGetsDarker` dans
 [map0_s00_2.c retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_2.c).

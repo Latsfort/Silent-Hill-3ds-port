@@ -260,10 +260,28 @@ static void split_twist_y(BoneXform *bone, int16_t angle)
 
 #include "split_head_twist.h"
 #include "bone_interpolation.h"
+#include "match_pose_data.h"
+
+/* func_8007D090 / func_80044F14: postmultiply local rotation, retaining translation. */
+static bool match_arm_pose(BoneXform *bones, int count)
+{
+    for (unsigned i = 0; i < sizeof(s_match_pose) / sizeof(s_match_pose[0]); i++) {
+        if (s_match_pose[i].bone >= (unsigned)count) { return false; }
+        BoneXform rotation;
+        xform_identity(&rotation);
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                rotation.m[row][column] = s_match_pose[i].matrix[row][column];
+            }
+        }
+        xform_mul(&bones[s_match_pose[i].bone], &bones[s_match_pose[i].bone], &rotation);
+    }
+    return true;
+}
 
 static bool build_skeleton(int *bone_count_out, const uint8_t *anm, size_t anm_size, int keyframe,
                           const uint8_t *wep_kf, size_t wep_kf_size, int wep_kf_base, bool is_player, int16_t twist,
-                          const ShAnimPoseTiming *pose)
+                          const ShAnimPoseTiming *pose, bool match_arm)
 {
     s_pose_bone_count = 0;
     if (!anm || anm_size < 0x14) {
@@ -377,6 +395,7 @@ static bool build_skeleton(int *bone_count_out, const uint8_t *anm, size_t anm_s
     }
 
     if (!split_twist_bones(s_local, bone_count, twist)) { return false; }
+    if (match_arm && (!is_player || !match_arm_pose(s_local, bone_count))) { return false; }
     xform_identity(&s_world[0]);
     for (int i = 1; i < bone_count; i++) {
         const int parent = s_binds[i].parent;
@@ -406,6 +425,9 @@ static bool model_is_active(unsigned model_index, unsigned flags)
         model_index == 21u || model_index == 22u;
     if (!hand) {
         return true;
+    }
+    if (flags & SH_CHARA_F_HARRY_MATCH_HAND) {
+        return model_index == 17u || model_index == 20u;
     }
     if (flags & SH_CHARA_F_HARRY_GUN) {
         return model_index == 17u || model_index == 21u; /* empty L + gun R */
@@ -504,7 +526,8 @@ static bool chara_bake(ShMapVertex *out, size_t capacity, size_t *count_out, con
 
     int bone_count = 0;
     const bool is_player = (flags & (SH_CHARA_F_HARRY_HANDS | SH_CHARA_F_HARRY_GUN | SH_CHARA_F_HARRY_KNIFE)) != 0;
-    if (!build_skeleton(&bone_count, anm, anm_size, keyframe, wep_kf, wep_kf_size, wep_kf_base, is_player, twist, pose)) {
+    if (!build_skeleton(&bone_count, anm, anm_size, keyframe, wep_kf, wep_kf_size, wep_kf_base, is_player, twist, pose,
+                        (flags & SH_CHARA_F_HARRY_MATCH_ARM) != 0)) {
         return false;
     }
 

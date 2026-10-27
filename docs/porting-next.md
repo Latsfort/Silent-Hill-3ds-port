@@ -78,6 +78,31 @@ Next publish this coherent source checkpoint to GitHub main (main is still at
 c4b4787, an ancestor; first checkpoint c74eec8 was pushed to master), then finish
 GameFs_FlameGfxLoad/func_8003E740, right-arm local rotations and source flicker.
 
+Latest checkpoint: f677e18 has been pushed and verified on origin/main after the
+user explicitly approved publishing source/tests/docs to this exact GitHub repo.
+Cafe SD save/load emulator test also passes with the restored retail radius.
+
+Match arm pose now connected locally (not yet published): gen_match_pose.py reads
+the three func_80044F14 calls inside func_8007D090. Beware its argument order is
+rotZ, rotX, rotY, not XYZ. The generator executes SHA1-verified BODYPROG's actual
+Math_RotMatrixZxyNegGte instructions, including GPL/GPF, and cross-checks all64
+quarter-turn combinations against the non-GTE original routine. Generated matrices
+target bones8/9/10; chara.c postmultiplies their LOCAL matrices before hierarchy
+composition, retaining local translation. New MATCH_HAND/ARM flags affect Harry
+only; hand swap is empty left17 + melee right20. game.c enables hand on torch_match
+and arm only after torch animation ends (state84 must not get the <58 pose override).
+Native match_pose_regression passes all568 base frames: finite geometry, fixed
+shoulder anchor, unchanged left arm, moved right hand, no residual effect when
+disabled. make -j4 zero warnings. Full alley emulator scenario PASSES with the
+new pose: doors, darkness/torch animation, original flags and return to gameplay.
+This is not a visual comparison or proof of a rendered flame.
+Next implement original FLAME.TIM loading and func_8003E740: 8 original RNG16
+samples per unpaused source tick, local right-hand offset (1+Q12mul(angle,5),-7,
+33+Q12mul(angle,5)), source color counter, four projected corner jitters, UV128..191
+/0..63 from relocated64x64 FLAME.TIM, tpage44/clut4146, semi-transparency mode0.
+Draw only when current environment has UseLighter. Source torch effect is in
+world/world_effects.c lines37..181, called by Gfx_EffectsUpdate near461.
+
 Full goal remains active: port all scenes/progression/endings faithfully, then verify actual coverage. AGENTS.md applies. One agent; focused changes; reuse existing adapters/generators; user now authorizes make -j4 per coherent large block; run affected checks; do not claim hardware fidelity from native tests.
 
 ## Current verified state
