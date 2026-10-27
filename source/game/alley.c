@@ -947,6 +947,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         case 0:
             /* MapEven_CutsceneAlleyGetsDarker. */
             alley->torch_environment_time = 0;
+            alley->flame_requested = true;
             alley->grey_assets_loaded = false;
             alley->need_grey_assets = true;
             alley->border_step = 0;

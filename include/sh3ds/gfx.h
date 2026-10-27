@@ -148,6 +148,7 @@ typedef struct ShMapHud {
     uint32_t moving_locker_masks[3];
     float moving_locker_pivots[3][3];
     const struct ShSmoke *smoke;
+    const struct ShFlame *flame;
     const ShWaterPool *water;
     const ShWaterConfig *water_config;
     const ShWaterVisibility *water_visibility;
@@ -177,6 +178,8 @@ typedef struct ShMapHud {
 /* Paper-map marking atlas (MR_*.TIM); uploaded once, NULL clears it. */
 void sh_gfx_set_map_marks_atlas(const ShTim *tim);
 bool sh_gfx_set_smoke_atlas(const ShTim *tim);
+bool sh_gfx_set_flame_atlas(const ShTim *tim);
+size_t sh_gfx_flame_vertex_count(void);
 bool sh_gfx_set_water_atlas(const ShTim *tim);
 bool sh_gfx_set_piano_cursor(const ShTim *tim);
 bool sh_gfx_prepare_moving_object(uint32_t mask);

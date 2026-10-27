@@ -131,8 +131,15 @@ La pose du bras après allumage et la main droite fermée sont maintenant intég
 Les trois matrices sont produites par exécution de la routine MIPS/GTE du retail ;
 les 568 images de base de Harry passent les tests de géométrie, d'ancrage de
 l'épaule, de conservation du bras gauche et de désactivation de l'effet.
-Le dessin et le chargement de la flamme ainsi que la comparaison visuelle avec le
-retail sur émulateur/console restent à terminer.
+Le chargement de FLAME.TIM, les tirages aléatoires et couleurs d'origine, les quatre
+coins, le suivi de la main, la cadence de 30 Hz et la transparence sont intégrés.
+Le parcours Old 3DS vérifie maintenant la texture chargée et six sommets transmis
+au rendu ; l'éclairage utilise aussi le préréglage courant de la ruelle.
+Restent le scintillement d'environnement `func_800DD0CC` et la comparaison visuelle
+avec le retail. La projection utilise encore la caméra du port, sans preuve de
+parité avec les arrondis/saturations du RTPS matériel PS1. La capture visuelle a
+échoué avec « Computer Use app approval timed out » : aucun placement à l'écran
+ni résultat sur console n'est déclaré vérifié.
 Sources : `SH_ALLEY_DARKER` dans [alley.c](../source/game/alley.c),
 `MapEven_CutsceneAlleyGetsDarker` dans
 [map0_s00_2.c retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_2.c).

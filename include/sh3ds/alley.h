@@ -87,6 +87,7 @@ typedef struct ShAlley {
     bool redirected;
     bool movie_requested;
     bool movie_finished;
+    bool flame_requested;
 
     bool cam_active;
     ShCamera cam;

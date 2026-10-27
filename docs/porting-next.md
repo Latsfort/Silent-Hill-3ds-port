@@ -103,6 +103,40 @@ samples per unpaused source tick, local right-hand offset (1+Q12mul(angle,5),-7,
 Draw only when current environment has UseLighter. Source torch effect is in
 world/world_effects.c lines37..181, called by Gfx_EffectsUpdate near461.
 
+Flame is now integrated locally: gen_flame.py adapts the original func_8003E740
+body (8 RNG16 calls including its unused eighth sample, unsigned color wrap,
+source clipping/ordering, all four projected corner jitters and tpage44/clut4146).
+GameFs_FlameGfxLoad is requested at GetsDarker case0; original2304-byte FLAME.TIM
+is parsed/uploaded to64x64 texture, all nonzero palette entries verified STP.
+flame_mesh.c projects a current right-hand world bone and draws source geometry
+through the existing camera; simulation is30Hz, with non-mutating reprojection
+between ticks so60Hz does not double RNG consumption or detach the image. UVs
+use original inclusive texel centers. gfx.c reuses particle setup with an explicit
+blend selector; existing water/smoke calls retain additive mode, flame uses source
+half alpha and no fog. env_light_from_harry now selects the alley's actual preset
+and render_map passes that light for the alley; previously only town had a light.
+Game.flame state persists across alley reset like the BODYPROG sprite counter.
+
+Verification: make -j4 zero warnings; native flame_regression passes clipping,
+RNG order/pause, color underflow/wrap,30/60Hz equality, between-tick hand movement,
+texture alpha and geometry. Existing environment regression passes56889 source
+mixes/fog samples. Old3DS run_alley_regression PASSES after light integration:
+flame ready=1 visible=1 vertices=6 shade48 depth1300 at gameplay return, flags13..17.
+Do not close D13: screenshot capture was NOT obtained (Computer Use app approval
+timed out; runner completed normally and restored SD files). Camera projection
+currently uses port float math and floor, not a verified PS1 RTPS/GTE implementation.
+Hardware visual/occlusion/size/color comparison remains necessary.
+
+Next D13: source func_800DD0CC environment flicker, then visual QA and D12 corpse.
+Flicker types in map0_s00.h: D_800DFB44 has int16 field_0 and Q12 angle field_2;
+D_800DFB48 has three uint8 fields0/1/2. SHA1-verified MAP0 overlay at0x800DFB40
+contains initial tuple(-1,0,0,64,48,64), format<ihh3B, base0x800C9578. Generate
+these values; do not hand-copy them. func_800DD0CC starts a10->6 environment
+transition controlled by its own value over0..Q12(100), updates both signed16
+timers and invokes Rng_GenerateUInt32..95/32..63 (macro uses RNG16 % range).
+Its vecs[0] is intentionally overwritten after an early branch; preserve RNG order.
+Original flicker runs while flag17 is set, including the final modal message.
+
 Full goal remains active: port all scenes/progression/endings faithfully, then verify actual coverage. AGENTS.md applies. One agent; focused changes; reuse existing adapters/generators; user now authorizes make -j4 per coherent large block; run affected checks; do not claim hardware fidelity from native tests.
 
 ## Current verified state

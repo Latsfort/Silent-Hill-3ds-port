@@ -13,6 +13,7 @@
 #include "sh3ds/inventory.h"
 #include "sh3ds/maptex.h"
 #include "sh3ds/movie.h"
+#include "sh3ds/flame.h"
 #include "sh3ds/radio.h"
 #include "sh3ds/savegame.h"
 #include "sh3ds/save_menu.h"
@@ -135,6 +136,8 @@ typedef struct ShGame {
     ShSaveMenu save_menu;
     ShGamePhase save_return_phase;
     ShMovie movie;
+    ShFlame flame;
+    bool flame_ready;
     uint64_t movie_start_ms;
     int title_sel;
     float radio_time; /* seconds, for static pulse */

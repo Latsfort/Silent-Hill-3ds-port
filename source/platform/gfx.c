@@ -5,6 +5,7 @@
 #include "sh3ds/config.h"
 #include "sh3ds/item_model.h"
 #include "sh3ds/smoke_mesh.h"
+#include "sh3ds/flame_mesh.h"
 #include "sh3ds/water_mesh.h"
 #include "sh3ds/water_texture.h"
 #include "sh3ds/drain.h"
@@ -94,6 +95,10 @@ static C3D_Tex s_piano_cursor_tex;
 static bool s_piano_cursor_ready;
 static ShMapVertex *s_smoke_vbo;
 static size_t s_smoke_draw_count;
+static C3D_Tex s_flame_tex;
+static bool s_flame_tex_ok, s_flame_ready;
+static ShMapVertex *s_flame_vbo;
+static size_t s_flame_draw_count;
 static C3D_Tex s_water_tex;
 static C3D_Tex s_water_ribbon_tex;
 static bool s_water_ribbon_tex_ok;
@@ -105,6 +110,7 @@ static ShMapVertex *s_water_vbo;
 static size_t s_water_draw_count;
 
 size_t sh_gfx_smoke_vertex_count(void) { return s_smoke_draw_count; }
+size_t sh_gfx_flame_vertex_count(void) { return s_flame_draw_count; }
 size_t sh_gfx_water_vertex_count(void) { return s_water_draw_count; }
 
 #define SH_PLAYER_MAX_VERTS (900 * 3)
@@ -303,6 +309,9 @@ void sh_gfx_shutdown(void)
         s_smoke_tex_ok = false;
     }
     s_smoke_ready = false;
+    if (s_flame_vbo) { linearFree(s_flame_vbo); s_flame_vbo = NULL; }
+    if (s_flame_tex_ok) { C3D_TexDelete(&s_flame_tex); s_flame_tex_ok = false; }
+    s_flame_ready = false;
     if (s_water_vbo) {
         linearFree(s_water_vbo);
         s_water_vbo = NULL;
@@ -537,6 +546,25 @@ bool sh_gfx_set_water_atlas(const ShTim *tim)
     C3D_TexFlush(&s_water_ribbon_tex);
     C3D_TexFlush(&s_water_surface_tex);
     s_water_ready = true;
+    return true;
+}
+
+bool sh_gfx_set_flame_atlas(const ShTim *tim)
+{
+    s_flame_ready = false;
+    if (!tim) { return false; }
+    if (!s_flame_vbo) { s_flame_vbo = linearAlloc(sizeof(ShMapVertex) * 6); }
+    if (!s_flame_tex_ok) {
+        s_flame_tex_ok = C3D_TexInit(&s_flame_tex, SH_FLAME_TEXTURE_W, SH_FLAME_TEXTURE_H, GPU_RGBA8);
+        if (s_flame_tex_ok) {
+            C3D_TexSetFilter(&s_flame_tex, GPU_NEAREST, GPU_NEAREST);
+            C3D_TexSetWrap(&s_flame_tex, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
+        }
+    }
+    if (!s_flame_vbo || !s_flame_tex_ok || !sh_flame_decode(tim, s_flame_tex.data,
+        SH_FLAME_TEXTURE_W * SH_FLAME_TEXTURE_H)) { return false; }
+    C3D_TexFlush(&s_flame_tex);
+    s_flame_ready = true;
     return true;
 }
 
@@ -1320,7 +1348,8 @@ static void draw_character(const C3D_Mtx *view, const ShMapVertex *vbo, size_t c
     environment_fog(s_draw_environment);
 }
 
-static void draw_additive_particles(ShMapVertex *vertices, size_t count, C3D_Tex *texture, const C3D_Mtx *view, bool source_shades)
+static void draw_particles(ShMapVertex *vertices, size_t count, C3D_Tex *texture, const C3D_Mtx *view,
+                            bool source_shades, bool additive)
 {
     if (!count) { return; }
     GSPGPU_FlushDataCache(vertices, count * sizeof(ShMapVertex));
@@ -1333,8 +1362,9 @@ static void draw_additive_particles(ShMapVertex *vertices, size_t count, C3D_Tex
     C3D_CullFace(GPU_CULL_NONE);
     C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_COLOR);
     C3D_AlphaTest(true, GPU_GREATER, 0);
-    /* BLD and WATER: additive pages, all nonzero texels have STP. */
-    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ONE, GPU_ZERO, GPU_ONE);
+    /* BLD/WATER use additive pages; FLAME uses half-blend alpha from STP. */
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, additive ? GPU_ONE : GPU_SRC_ALPHA,
+        additive ? GPU_ONE : GPU_ONE_MINUS_SRC_ALPHA, GPU_ZERO, GPU_ONE);
     C3D_BufInfo *buf = C3D_GetBufInfo();
     BufInfo_Init(buf);
     BufInfo_Add(buf, vertices, sizeof(ShMapVertex), 3, 0x210);
@@ -1355,7 +1385,7 @@ static void draw_smoke(const ShSmoke *smoke, const ShCamera *camera, const C3D_M
 {
     if (!s_smoke_ready || !smoke) { return; }
     s_smoke_draw_count = sh_smoke_build_mesh(smoke, camera, s_smoke_vbo, SH_SMOKE_CAPACITY * 6);
-    draw_additive_particles(s_smoke_vbo, s_smoke_draw_count, &s_smoke_tex, view, false);
+    draw_particles(s_smoke_vbo, s_smoke_draw_count, &s_smoke_tex, view, false, true);
 }
 
 static void draw_water(const ShMapHud *hud, const ShCamera *camera, const C3D_Mtx *view)
@@ -1363,13 +1393,13 @@ static void draw_water(const ShMapHud *hud, const ShCamera *camera, const C3D_Mt
     if (!s_water_ready || !hud) { return; }
     const size_t surface = sh_water_surface_build_mesh(hud->water_surface, hud->water_surface_count, camera,
         s_water_surface_vbo, SH_WATER_SURFACE_MAX_QUADS * 6);
-    draw_additive_particles(s_water_surface_vbo, surface, &s_water_surface_tex, view, true);
+    draw_particles(s_water_surface_vbo, surface, &s_water_surface_tex, view, true, true);
     const size_t ribbons = sh_water_ribbon_build_mesh_visible(hud->water, hud->water_config, camera,
         hud->environment, hud->environment_light, s_water_vbo, SH_ROOF_WATER_POOL_COUNT * 6, hud->water_visibility);
-    draw_additive_particles(s_water_vbo, ribbons, &s_water_ribbon_tex, view, false);
+    draw_particles(s_water_vbo, ribbons, &s_water_ribbon_tex, view, false, true);
     s_water_draw_count = sh_water_spray_build_mesh_visible(hud->water, hud->water_spray, hud->water_spray_count,
         camera, hud->environment, hud->environment_light, s_water_vbo + ribbons, SH_ROOF_WATER_POOL_COUNT * 6 - ribbons, hud->water_visibility);
-    draw_additive_particles(s_water_vbo + ribbons, s_water_draw_count, &s_water_tex, view, false);
+    draw_particles(s_water_vbo + ribbons, s_water_draw_count, &s_water_tex, view, false, true);
     s_water_draw_count += ribbons + surface;
 }
 
@@ -1517,6 +1547,10 @@ static void draw_map_geometry(const ShCamera *camera, const ShPlayerPose *player
 
     draw_smoke(smoke, camera, &view);
     draw_water(hud, camera, &view);
+    if (s_flame_ready && hud && hud->flame) {
+        s_flame_draw_count = sh_flame_build_mesh(hud->flame, camera, s_flame_vbo, 6);
+        draw_particles(s_flame_vbo, s_flame_draw_count, &s_flame_tex, &view, true, false);
+    }
     draw_item_overlay();
 
     /* Hand the GPU back to Citro2D in the state it expects. */
@@ -1556,6 +1590,7 @@ void sh_gfx_draw_map(const ShCamera *camera, const ShPlayerPose *player, const S
                      const ShMapHud *hud)
 {
     s_smoke_draw_count = 0;
+    s_flame_draw_count = 0;
     s_water_draw_count = 0;
     s_moving_draw_count = 0;
     const u32 clear = C2D_Color32f(s_clear.r, s_clear.g, s_clear.b, s_clear.a);

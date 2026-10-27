@@ -214,6 +214,9 @@ void sh_autotest_log(ShGame *g)
             (unsigned)g->movie.fps_num, (unsigned)g->movie.fps_den, g->movie.failed);
     }
     if (sh_alley_active(&g->alley)) {
+        fprintf(s_log, "flame ready=%d visible=%d vertices=%u shade=%u depth=%ld\n",
+            g->flame_ready, g->flame.visible, (unsigned)sh_gfx_flame_vertex_count(),
+            g->flame.sprite.shade, (long)g->flame.sprite.depth);
         fprintf(s_log, "alley=%d/%d torch=%d/%d kf=%d timer=%ld border=%u/%ld flags=%d%d%d%d%d\n",
             (int)g->alley.stage, g->alley.step, g->alley.torch_active, g->alley.torch_match,
             g->harry_anim_kf, (long)g->alley.torch_environment_time, g->alley.border.state,

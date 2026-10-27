@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds = 150)
+param([int]$TimeoutSeconds = 150, [switch]$VisualHold)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $sdRoot = Join-Path $env:APPDATA 'Azahar/sdmc'
@@ -17,6 +17,7 @@ $steps = @('log 1', '60 NONE', '1 A', '900 NONE', '1 START', '3 NONE',
     'warp -57.25 -47 -90', '3 NONE', '1 A', '300 NONE',
     'warp -110 -224.6 180', '3 NONE', '1 A', '300 NONE',
     '60 NONE 0 154', '180 NONE', '1 A', '180 NONE', '1 A', '60 NONE', 'quit')
+if ($VisualHold) { $steps = $steps[0..($steps.Count - 2)] + @('1800 NONE', 'quit') }
 try {
     $completed = $false
     for ($attempt = 0; $attempt -lt 3; $attempt++) {
@@ -44,6 +45,7 @@ try {
             if ($log -notmatch 'alley=10/8 torch=1/0 kf=98[0-9]') { throw 'Torch animation did not reach rendered frames.' }
             if ($log -notmatch 'alley=10/11 torch=1/1 kf=993') { throw 'Final torch pose and second message were not reached.' }
             if ($log -notmatch 'alley=9/0 torch=0/1 .*flags=11111') { throw 'Scene did not return control with original flags.' }
+            if ($log -notmatch 'flame ready=1 visible=1 vertices=6') { throw 'Lighter texture/geometry did not reach the renderer.' }
             Write-Output 'PASS: Old 3DS alley doors, darkness messages, rendered torch animation and return to gameplay.'
             $completed = $true
             break

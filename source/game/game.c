@@ -7,6 +7,7 @@
 #include "sh3ds/controls.h"
 #include "sh3ds/debug_checkpoints.h"
 #include "sh3ds/fixed.h"
+#include "sh3ds/flame_mesh.h"
 #include "sh3ds/event_image.h"
 #include "sh3ds/gfx.h"
 #include "sh3ds/inventory.h"
@@ -436,6 +437,8 @@ static ShCharaBone s_harry_light_bone;
 static bool s_harry_light_bone_valid;
 static ShCharaBone s_harry_hand_bone;
 static bool s_harry_hand_bone_valid;
+static ShCharaBone s_match_hand_bone;
+static bool s_match_hand_bone_valid;
 static ShEnvLight s_environment_light;
 
 static unsigned harry_hand_flags(const ShGame *game)
@@ -769,6 +772,7 @@ static bool bake_harry_frame(ShGame *game, int keyframe, bool use_wep)
     }
     s_harry_light_bone_valid = sh_chara_last_bone((unsigned)sh_env_flashlight_bone(), &s_harry_light_bone);
     s_harry_hand_bone_valid = sh_chara_last_bone(sh_drain_valve_hand_bone(), &s_harry_hand_bone);
+    s_match_hand_bone_valid = sh_chara_last_bone(SH_HARRY_HELD_BONE, &s_match_hand_bone);
     if (s_harry_have_tim && s_harry_cluts.count > 0 && !s_harry_tim_uploaded) {
         s_harry_tim_uploaded = sh_gfx_set_player_clut_atlas(&s_harry_tim_parsed, s_phone_tim_ready ? &s_phone_tim : NULL, &s_harry_cluts);
     }
@@ -913,12 +917,14 @@ static void update_harry_anim(ShGame *game, float move_amount, bool running, flo
 /* Game_FlashlightAttributesFix / Gfx_FlashlightPositionUpdate, using the current Harry torso pose. */
 static bool environment_light_from_harry(const ShGame *game, ShEnvLight *light)
 {
+    const ShEnvState *environment = sh_alley_active(&game->alley) ?
+        &game->alley.environment.current : &game->town.environment.current;
     if (game->save.map_idx == SH_MAP_IDX_MAP1_S03 && game->town.school.drain_light_override) {
         const ShDrainLight *attributes = &game->town.school.drain_light;
         const int32_t position[3] = {attributes->position.vx, attributes->position.vy, attributes->position.vz};
         int32_t direction[3];
         sh_drain_light_direction(attributes, direction);
-        sh_env_light_build(light, game->town.environment.current.preset.spot_light, position, direction);
+        sh_env_light_build(light, environment->preset.spot_light, position, direction);
         return true;
     }
     if (!s_harry_light_bone_valid) {
@@ -949,7 +955,7 @@ static bool environment_light_from_harry(const ShGame *game, ShEnvLight *light)
     direction[0] = (int32_t)(((int64_t)cosine * local_direction[0] + (int64_t)sine * local_direction[2]) >> 12);
     direction[1] = local_direction[1];
     direction[2] = (int32_t)((-(int64_t)sine * local_direction[0] + (int64_t)cosine * local_direction[2]) >> 12);
-    sh_env_light_build(light, game->town.environment.current.preset.spot_light, position, direction);
+    sh_env_light_build(light, environment->preset.spot_light, position, direction);
     return true;
 }
 
@@ -2508,6 +2514,19 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
             open_movie(game, 16);
             return;
         }
+        if (game->alley.flame_requested) {
+            static uint8_t flame_file[SH_FLAME_TIM_BYTES];
+            size_t size = 0;
+            ShTim tim;
+            game->flame_ready = read_file_into(SH_TEXTURE_DIR "/FLAME.TIM", flame_file, sizeof(flame_file), &size) &&
+                sh_tim_parse(flame_file, size, &tim) && sh_gfx_set_flame_atlas(&tim);
+            game->alley.flame_requested = false;
+            if (!game->flame_ready) {
+                game->load_error = "FLAME.TIM n'a pas pu etre charge.";
+                game->phase = SH_PHASE_LOADING;
+                return;
+            }
+        }
         if (sh_alley_needs_grey_assets(&game->alley)) {
             load_npcs_alley_grey();
             sh_alley_clear_grey_assets_flag(&game->alley);
@@ -2766,6 +2785,16 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
         } else if (sh_cafe_camera(&game->cafe, &cut)) {
             game->camera = cut;
         }
+    }
+    if (alley_active && game->flame_ready && s_match_hand_bone_valid &&
+        (game->alley.environment.current.preset.flags[0] & SH_FLAME_ENV_FLAG)) {
+        const int32_t position[3] = {SH_Q12(game->player_pos[0]), -SH_Q12(game->player_pos[1]), -SH_Q12(game->player_pos[2])};
+        ShCharaBone world_hand;
+        sh_drain_valve_world_bone(&s_match_hand_bone, position,
+            SH_Q12(-game->player_yaw / (2.0f * 3.14159265358979323846f)), &world_hand);
+        sh_flame_update(&game->flame, &game->camera, &world_hand, dt);
+    } else {
+        game->flame.visible = game->flame.started = false;
     }
 }
 
@@ -3281,8 +3310,10 @@ static void render_map(const ShGame *game)
     }
     if (alley_active && game->alley.environment.active) {
         hud.environment = &game->alley.environment.current;
+        if (environment_light_from_harry(game, &s_environment_light)) { hud.environment_light = &s_environment_light; }
         hud.retail_borders = (game->alley.border.state & SH_BORDER_ACTIVE) != 0;
         hud.border_shade = game->alley.border.shade;
+        if (!inv_open) { hud.flame = &game->flame; }
     }
     hud.hint = hint_buf;
     if (game->save.map_idx == SH_MAP_IDX_MAP1_S03 && game->water_ready) {
