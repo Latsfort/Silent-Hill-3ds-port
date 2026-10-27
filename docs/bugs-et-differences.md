@@ -112,9 +112,21 @@ Sources : `SH_ALLEY_FMV` dans [alley.c](../source/game/alley.c),
 [événements retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_events_data.c),
 [lecteur retail](../vendor/silent-hill-decomp/src/screens/stream/stream.c).
 
-**D12 — Mise en scène du corps dans la ruelle absente — confirmé ; ordre seul corrigé.**
+**D12 — Mise en scène du corps dans la ruelle incomplète — confirmé ; décor corrigé.**
 Le retail déplace Harry puis montre le corps avec une caméra liée à sa tête.
 Le port présente les répliques avec caméra scriptée désactivée et fondu noir.
+Le déclenchement remplace désormais THRF906 par THRF908 au morceau logique
+(-7, 6), comme `WorldMap_ChunkSet`, en déplaçant ensemble le décor et les
+origines des collisions (`func_80044044`). Le rechargement conserve la position
+et l'orientation de Harry. Ce remplacement ne corrige pas encore la caméra,
+le parcours de Harry ni les délais des répliques.
+Le test natif `tools/ipd_relocation_regression.c` vérifie sur THRF908 les
+2 223 sommets, les textures et couleurs inchangées, les origines des collisions,
+l'aller-retour exact des octets et le rejet des entrées tronquées.
+Compilation 3DS sans avertissement et progression native à 30/60 FPS vérifiées.
+`tools/run_alley_regression.ps1 -Nightmare` passe sous Azahar configuré Old 3DS :
+chargement de THRF908 relocalisé, fin de scène et retour au combat actuel.
+Ni fidélité visuelle de la scène ni exécution sur console vérifiées.
 Sources : `SH_ALLEY_NIGHTMARE` dans [alley.c](../source/game/alley.c),
 `MapEvent_CutsceneAlleyNightmare` dans
 [map0_s00_2.c retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_2.c).

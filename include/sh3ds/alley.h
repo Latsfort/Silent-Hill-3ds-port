@@ -90,6 +90,8 @@ typedef struct ShAlley {
     bool movie_requested;
     bool movie_finished;
     bool flame_requested;
+    bool nightmare_world;
+    bool nightmare_world_requested;
 
     bool cam_active;
     ShCamera cam;

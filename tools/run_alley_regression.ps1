@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds = 150, [switch]$VisualHold)
+param([int]$TimeoutSeconds = 150, [switch]$VisualHold, [switch]$Nightmare)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $sdRoot = Join-Path $env:APPDATA 'Azahar/sdmc'
@@ -18,6 +18,9 @@ $steps = @('log 1', '60 NONE', '1 A', '900 NONE', '1 START', '3 NONE',
     'warp -110 -224.6 180', '3 NONE', '1 A', '300 NONE',
     '60 NONE 0 154', '180 NONE', '1 A', '180 NONE', '1 A', '60 NONE', 'quit')
 if ($VisualHold) { $steps = $steps[0..($steps.Count - 2)] + @('1800 NONE', 'quit') }
+if ($Nightmare) {
+    $steps = $steps[0..($steps.Count - 2)] + @('warp -252 -222 0', '660 NONE', 'quit')
+}
 try {
     $completed = $false
     for ($attempt = 0; $attempt -lt 3; $attempt++) {
@@ -49,6 +52,14 @@ try {
             $flicker = [regex]::Matches($log, 'flame ready=1 visible=1 vertices=6[^\r\n]*flicker=(\d+) spot=(\d+)')
             $values = @($flicker | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
             if ($values.Count -lt 2) { throw 'Lighter environment flicker did not vary in gameplay.' }
+            if ($Nightmare) {
+                $bytes = (Get-Item (Join-Path $projectRoot 'dump/assets/BG/THRF908.IPD')).Length
+                if ($log -notmatch "nightmare chunk=-7,6 header=-7,6 bytes=$bytes pending=0") {
+                    throw 'Original corpse chunk was not loaded and relocated at the nightmare event.'
+                }
+                if ($log -notmatch 'alley=12/') { throw 'Nightmare did not return to the fight.' }
+                Write-Output 'PASS: original corpse chunk and collisions loaded at (-7,6), scene returned to gameplay.'
+            }
             Write-Output 'PASS: Old 3DS alley doors, darkness messages, rendered torch animation and return to gameplay.'
             $completed = $true
             break

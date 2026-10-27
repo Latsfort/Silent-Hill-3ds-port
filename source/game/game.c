@@ -12,6 +12,7 @@
 #include "sh3ds/gfx.h"
 #include "sh3ds/inventory.h"
 #include "sh3ds/item_model.h"
+#include "sh3ds/ipd.h"
 #include "sh3ds/piano_render_data.h"
 #include "sh3ds/map.h"
 #include "sh3ds/memory.h"
@@ -142,7 +143,7 @@ static bool read_file_into(const char *path, uint8_t *buffer, size_t capacity, s
 }
 
 /* Reads a whole romfs file into the level arena. */
-static const uint8_t *load_file(const char *path, size_t *size_out)
+static uint8_t *load_file(const char *path, size_t *size_out)
 {
     FILE *file = fopen(path, "rb");
     if (!file) {
@@ -1468,9 +1469,19 @@ static void load_area_ex(ShGame *game, int index, int focus_x, int focus_z, int 
             }
         }
 
-        snprintf(path, sizeof(path), "%s/%s", SH_BG_DIR, entry->d_name);
+        const bool nightmare_chunk = game->alley.nightmare_world &&
+            strcmp(area, "THR") == 0 && x == -7 && z == 6;
+        snprintf(path, sizeof(path), "%s/%s", SH_BG_DIR,
+                 nightmare_chunk ? "THRF908.IPD" : entry->d_name);
         ShMapChunk *chunk = &game->chunks[game->chunk_count];
-        chunk->data = load_file(path, &chunk->size);
+        uint8_t *data = load_file(path, &chunk->size);
+        if (nightmare_chunk && (!data || !sh_ipd_relocate(data, chunk->size, x, z))) {
+            closedir(dir);
+            game->load_error = "THRF908.IPD n'a pas pu etre charge.";
+            sh_assets_log("nightmare chunk load failed %s", path);
+            return;
+        }
+        chunk->data = data;
         if (!chunk->data) {
             continue;
         }
@@ -2425,6 +2436,23 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
     const bool cafe_active = game->cafe.stage != SH_CAFE_OFF;
     bool cafe_lock = false;
     bool map_open = sh_cafe_map_open(&game->cafe) || sh_town_map_open(&game->town);
+
+    if (game->alley.nightmare_world_requested) {
+        float position[3];
+        memcpy(position, game->player_pos, sizeof(position));
+        const float yaw = game->player_yaw;
+        const int cx = (int)floorf(position[0] / SH_CHUNK_METERS);
+        const int cz = (int)floorf(-position[2] / SH_CHUNK_METERS);
+        load_area_ex(game, game->area_index, cx, cz, 5);
+        memcpy(game->player_pos, position, sizeof(position));
+        game->player_yaw = yaw;
+        game->alley.nightmare_world_requested = false;
+        if (game->area_loaded) {
+            window_job_start(game, cx, cz);
+        }
+        game->phase = SH_PHASE_LOADING;
+        return;
+    }
 
     if (game->alley.room_ready) {
         const int cx = (int)floorf(game->alley.room_x / SH_CHUNK_METERS);

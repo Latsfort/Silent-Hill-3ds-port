@@ -932,6 +932,9 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             alley->skip_collision = false;
         } else if (sh_alley_nightmare_trigger(save, px, pz)) {
             alley->stage = SH_ALLEY_NIGHTMARE;
+            /* CutsceneAlleyNightmare case 0: WorldMap_ChunkSet. */
+            alley->nightmare_world = true;
+            alley->nightmare_world_requested = true;
             alley->step = 0;
             alley->wait = 0.0f;
             alley->controls_locked = true;

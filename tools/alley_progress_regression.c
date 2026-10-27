@@ -141,6 +141,7 @@ static void run(float dt)
     x = -252.0f; z = -222.0f;
     sh_alley_update(&alley, &save, &x, &y, &z, &yaw, &input, dt);
     assert(alley.stage == SH_ALLEY_NIGHTMARE);
+    assert(alley.nightmare_world && alley.nightmare_world_requested);
     for (int i = 0; i < (int)(10.0f / dt); i++) {
         sh_alley_update(&alley, &save, &x, &y, &z, &yaw, &input, dt);
         if (alley.stage == SH_ALLEY_FIGHT) { break; }

@@ -214,6 +214,16 @@ void sh_autotest_log(ShGame *g)
             (unsigned)g->movie.fps_num, (unsigned)g->movie.fps_den, g->movie.failed);
     }
     if (sh_alley_active(&g->alley)) {
+        if (g->alley.nightmare_world) {
+            for (int i = 0; i < g->chunk_count; i++) {
+                const ShMapChunk *chunk = &g->chunks[i];
+                if (chunk->x == -7 && chunk->z == 6) {
+                    fprintf(s_log, "nightmare chunk=%d,%d header=%d,%d bytes=%lu pending=%d\n",
+                        chunk->x, chunk->z, (int8_t)chunk->data[2], (int8_t)chunk->data[3],
+                        (unsigned long)chunk->size, g->alley.nightmare_world_requested);
+                }
+            }
+        }
         fprintf(s_log, "flame ready=%d visible=%d vertices=%u shade=%u depth=%ld flicker=%ld spot=%d ambient=%d\n",
             g->flame_ready, g->flame.visible, (unsigned)sh_gfx_flame_vertex_count(),
             g->flame.sprite.shade, (long)g->flame.sprite.depth, (long)g->alley.flicker.value,
