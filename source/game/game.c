@@ -788,7 +788,7 @@ static void update_harry_anim(ShGame *game, float move_amount, bool running, flo
     /* Cutscene scripted poses (CharaAnimCmd_SetState) override locomotion. */
     {
         int keyframe;
-        if (sh_town_harry_keyframe(&game->town, &keyframe)) {
+        if (sh_alley_harry_keyframe(&game->alley, &keyframe) || sh_town_harry_keyframe(&game->town, &keyframe)) {
             if (keyframe != game->harry_anim_kf || s_harry_using_wep ||
                 harry_hand_flags(game) != (unsigned)s_harry_hand_flags || harry_phone_visible(game) != s_harry_phone_visible) {
                 bake_harry_frame(game, keyframe, false);
@@ -2493,6 +2493,10 @@ static void update_player(ShGame *game, const ShInputState *input, float dt)
         /* Inventory_Update returns to gameplay on the next frame. */
         return;
     } else if (alley_active) {
+        if (!game->alley.torch_active) {
+            game->alley.torch_player.model.keyframe = game->harry_anim_kf;
+            game->alley.torch_player.extra_model.keyframe = game->harry_anim_kf;
+        }
         cafe_lock =
             sh_alley_update(&game->alley, &game->save, &game->player_pos[0], &game->player_pos[1], &game->player_pos[2],
                             &game->player_yaw, input, dt);
@@ -3270,6 +3274,11 @@ static void render_map(const ShGame *game)
         if (environment_light_from_harry(game, &s_environment_light)) {
             hud.environment_light = &s_environment_light;
         }
+    }
+    if (alley_active && game->alley.environment.active) {
+        hud.environment = &game->alley.environment.current;
+        hud.retail_borders = (game->alley.border.state & SH_BORDER_ACTIVE) != 0;
+        hud.border_shade = game->alley.border.shade;
     }
     hud.hint = hint_buf;
     if (game->save.map_idx == SH_MAP_IDX_MAP1_S03 && game->water_ready) {

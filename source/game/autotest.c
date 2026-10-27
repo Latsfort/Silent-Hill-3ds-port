@@ -144,6 +144,7 @@ void sh_autotest_log(ShGame *g)
         g->player_yaw = s_warp[2] / 57.2958f;
         g->town.need_ground_snap = true;
         sh_vc_warp(&g->town.vc);
+        sh_vc_warp(&g->alley.vc);
         fprintf(s_log, "WARP %.2f,%.2f yaw=%.1f\n", s_warp[0], s_warp[1], s_warp[2]);
     }
     if (s_probe) {
@@ -211,6 +212,13 @@ void sh_autotest_log(ShGame *g)
         fprintf(s_log, "movie frame=%u count=%u size=%dx%d fps=%u/%u failed=%d\n",
             (unsigned)g->movie.frame_index, (unsigned)g->movie.frame_count, g->movie.image.width, g->movie.image.height,
             (unsigned)g->movie.fps_num, (unsigned)g->movie.fps_den, g->movie.failed);
+    }
+    if (sh_alley_active(&g->alley)) {
+        fprintf(s_log, "alley=%d/%d torch=%d/%d kf=%d timer=%ld border=%u/%ld flags=%d%d%d%d%d\n",
+            (int)g->alley.stage, g->alley.step, g->alley.torch_active, g->alley.torch_match,
+            g->harry_anim_kf, (long)g->alley.torch_environment_time, g->alley.border.state,
+            (long)g->alley.border.shade, sh_save_event_get(&g->save, 13), sh_save_event_get(&g->save, 14),
+            sh_save_event_get(&g->save, 15), sh_save_event_get(&g->save, 16), sh_save_event_get(&g->save, 17));
     }
     if (g->save.map_idx == SH_MAP_IDX_MAP1_S00 || g->save.map_idx == SH_MAP_IDX_MAP1_S01) {
         fprintf(s_log, "area=%s school=%d/%d image=%s shade=%u objects=%d mask=%u\n", g->area_names[g->area_index],

@@ -34,6 +34,7 @@ bool sh_path_player_step(ShPath *path, ShPathPlayer *player, int state,
 void sh_path_state_set(ShPathPlayer *player, int state);
 void sh_path_arrival_start(ShPathPlayer *player);
 bool sh_path_school_animation_start(ShPathPlayer *player, int state);
+bool sh_path_alley_animation_start(ShPathPlayer *player, int state);
 bool sh_path_school_animation_done(const ShPathPlayer *player);
 bool sh_path_animation_first(const ShPathPlayer *player, int *first);
 void sh_path_locomotion(ShPath *path, ShPathPlayer *player, int keyframe, int32_t dt);

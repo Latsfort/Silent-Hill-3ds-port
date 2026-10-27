@@ -20,6 +20,7 @@
 
 #include "alley_camera_data.h"
 #include "alley_npc_data.h"
+#include "overlay_data.h"
 
 /* MAP_POINTS / cutscene anchors (PS1 → 3DS). */
 #define SH_INTRO_SPAWN_X (-6.2f)
@@ -338,6 +339,7 @@ void sh_alley_reset(ShAlley *alley)
     alley->timer = -1.0f;
     sh_vc_init(&alley->vc, s_alley_camera_roads,
                sizeof(s_alley_camera_roads) / sizeof(s_alley_camera_roads[0]));
+    sh_env_set(&alley->environment, s_overlay_info[0].presets[0], s_overlay_info[0].presets[1]);
 }
 
 void sh_alley_begin(ShAlley *alley, ShSavegame *save)
@@ -516,7 +518,7 @@ static bool in_footsteps_zone(float px, float pz)
 static void spawn_grey_children(ShAlley *alley)
 {
     alley->grey_count = SH_ALLEY_MAX_GREY;
-    alley->need_grey_assets = true;
+    alley->need_grey_assets = !alley->grey_assets_loaded;
     alley->cheryl_visible = false;
     for (int i = 0; i < SH_ALLEY_MAX_GREY; i++) {
         ShAlleyGrey *g = &alley->grey[i];
@@ -611,6 +613,7 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
     }
 
     fade_update(alley, dt);
+    sh_border_update(&alley->border, SH_Q12(dt));
     msg_tick(alley, dt);
     voice_tick(alley, dt);
 
@@ -926,7 +929,6 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             alley->controls_locked = true;
             alley->letterbox = true;
             alley->skip_collision = false;
-            fade_to(alley, 0.65f, 0.7f);
         } else if (sh_alley_nightmare_trigger(save, px, pz)) {
             alley->stage = SH_ALLEY_NIGHTMARE;
             alley->step = 0;
@@ -939,19 +941,64 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
 
     case SH_ALLEY_DARKER:
         alley->controls_locked = true;
-        alley->letterbox = true;
+        alley->letterbox = false;
         alley->cam_active = false;
         switch (alley->step) {
         case 0:
-            /* MapEven_CutsceneAlleyGetsDarker case 4: message 25 has no ~J timeout. */
+            /* MapEven_CutsceneAlleyGetsDarker. */
+            alley->torch_environment_time = 0;
+            alley->grey_assets_loaded = false;
+            alley->need_grey_assets = true;
+            alley->border_step = 0;
+            step_next(alley);
+            /* fallthrough */
+        case 1:
+            if (alley->border_step == 0) {
+                alley->border.state = SH_BORDER_FADEINSTART;
+                alley->border_step++;
+            } else if (alley->border.state == SH_BORDER_SHOWN) {
+                step_next(alley);
+            }
+            break;
+        case 2:
+            /* Free movement is stopped when controls_locked is applied. */
+            step_next(alley);
+            break;
+        case 3:
+            step_next(alley);
+            /* fallthrough */
+        case 4:
             set_msg(alley, "That's strange,\nit's getting darker.", NULL, 0.0f);
             if (sh_input_down(input, SH_BTN_ACTION)) {
                 set_msg(alley, NULL, NULL, 0.0f);
                 step_next(alley);
             }
             break;
-        case 1:
-            /* MapEven_CutsceneAlleyGetsDarker case 11: message 30 waits for input. */
+        case 5:
+            if (sh_save_event_get(save, 16)) { alley->step = 6; }
+            break;
+        case 6:
+            if (alley->grey_assets_loaded) { step_next(alley); }
+            break;
+        case 7:
+            save->equipped_weapon = SH_ITEM_UNEQUIPPED;
+            sh_path_alley_animation_start(&alley->torch_player, 84);
+            alley->torch_active = true;
+            step_next(alley);
+            /* fallthrough */
+        case 8:
+            if (sh_path_school_animation_done(&alley->torch_player)) { step_next(alley); }
+            break;
+        case 9:
+            sh_env_transition_begin(&alley->environment, 10, 10);
+            step_next(alley);
+            break;
+        case 10:
+            alley->torch_environment_time += SH_Q12(dt);
+            sh_env_transition_update(&alley->environment, alley->torch_environment_time, 0, SH_Q12(0.5f));
+            if (alley->torch_environment_time > SH_Q12(0.5f)) { step_next(alley); }
+            break;
+        case 11:
             sh_save_event_set(save, SH_EV_ALLEY_DARK);
             set_msg(alley, "......better than nothing,\nI guess.", NULL, 0.0f);
             if (sh_input_down(input, SH_BTN_ACTION)) {
@@ -960,8 +1007,9 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             }
             break;
         default:
-            sh_save_event_set(save, SH_EV_ALLEY_DARK);
-            fade_to(alley, 0.0f, 1.0f);
+            alley->border.state = SH_BORDER_FADEOUTSTART;
+            alley->torch_active = false;
+            sh_vc_warp(&alley->vc);
             /* MapEven_CutsceneAlleyGetsDarker default: Chara_Spawn Grey Children. */
             spawn_grey_children(alley);
             alley->stage = SH_ALLEY_ROAM;
@@ -1107,7 +1155,24 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         break;
     }
 
+    if (alley->torch_active) {
+        if (sh_path_school_animation_done(&alley->torch_player) && !alley->torch_match) {
+            const float position[3] = {px, player_y ? *player_y : 0.0f, pz};
+            sh_snd_at(1356, position, 0.5f);
+            alley->torch_match = true;
+        }
+        ShAnimPoseTiming pose;
+        sh_path_animation_timing(&alley->torch_player, SH_Q12(dt), 0, 0, &pose);
+    }
+    sh_env_update(&alley->environment, sh_save_flashlight_on(save), dt);
     return alley->controls_locked;
+}
+
+bool sh_alley_harry_keyframe(const ShAlley *alley, int *keyframe)
+{
+    if (!alley || !alley->torch_active) { return false; }
+    *keyframe = alley->torch_player.model.keyframe;
+    return true;
 }
 
 const char *sh_alley_subtitle(const ShAlley *alley)
@@ -1235,6 +1300,7 @@ void sh_alley_clear_grey_assets_flag(ShAlley *alley)
 {
     if (alley) {
         alley->need_grey_assets = false;
+        alley->grey_assets_loaded = true;
     }
 }
 

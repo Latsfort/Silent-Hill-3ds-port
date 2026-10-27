@@ -13,9 +13,16 @@ typedef struct ShPathAnimDef {
 
 #include "path_animation_data.h"
 #include "roof_animation_data.h"
+#include "alley_animation_data.h"
 
 static const ShPathAnimDef *animation_defs(int state, unsigned *count)
 {
+    for (unsigned i = 0; i < sizeof(s_alley_animation_states) / sizeof(s_alley_animation_states[0]); i++) {
+        if (s_alley_animation_states[i].state == state) {
+            *count = sizeof(s_alley_animation_defs) / sizeof(s_alley_animation_defs[0]);
+            return s_alley_animation_defs;
+        }
+    }
     for (unsigned i = 0; i < sizeof(s_roof_animation_states) / sizeof(s_roof_animation_states[0]); i++) {
         if (s_roof_animation_states[i].state == state) {
             *count = sizeof(s_roof_animation_defs) / sizeof(s_roof_animation_defs[0]);
@@ -52,6 +59,19 @@ static bool model_timing(ShPathModel *model, int state, int32_t dt, int stick_y,
 void sh_path_arrival_start(ShPathPlayer *player)
 {
     sh_path_school_animation_start(player, 74);
+}
+
+bool sh_path_alley_animation_start(ShPathPlayer *player, int state)
+{
+    for (unsigned i = 0; i < sizeof(s_alley_animation_states) / sizeof(s_alley_animation_states[0]); i++) {
+        if (s_alley_animation_states[i].state != state) { continue; }
+        sh_path_state_set(player, state);
+        player->model.animation_status = player->extra_model.animation_status = s_alley_animation_states[i].status;
+        player->model.state_step = player->extra_model.state_step = 1;
+        player->extra_model.control_state = 1;
+        return true;
+    }
+    return false;
 }
 
 bool sh_path_school_animation_start(ShPathPlayer *player, int state)

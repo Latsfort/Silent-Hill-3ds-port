@@ -87,6 +87,7 @@ void sh_alley_progress_update(ShAlley *alley, ShSavegame *save, float x, float z
         return;
     }
     if (alley->darkness < 0) {
+        sh_env_transition_begin(&alley->environment, 6, 6);
         alley->darkness = 0;
         sh_snd_play(SH_SFX_NIGHTMARE_AMB, 0, 32);
     }
@@ -105,4 +106,5 @@ void sh_alley_progress_update(ShAlley *alley, ShSavegame *save, float x, float z
     }
     if (alley->darkness >= SH_Q12(80.0f)) { sh_save_event_set(save, 15); }
     if (alley->darkness >= SH_Q12(100.0f)) { sh_save_event_set(save, 16); }
+    sh_env_transition_update(&alley->environment, alley->darkness, 0, SH_Q12(100.0f));
 }

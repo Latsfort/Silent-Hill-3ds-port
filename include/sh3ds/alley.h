@@ -9,6 +9,9 @@
 #include "sh3ds/input.h"
 #include "sh3ds/savegame.h"
 #include "sh3ds/vc.h"
+#include "sh3ds/path.h"
+#include "sh3ds/border.h"
+#include "sh3ds/environment.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,6 +75,12 @@ typedef struct ShAlley {
     float fade_target;
     float fade_speed;
     int32_t darkness;
+    ShEnvironment environment;
+    ShBorder border;
+    ShPathPlayer torch_player;
+    int32_t torch_environment_time;
+    bool torch_active, torch_match, grey_assets_loaded;
+    int border_step;
     float room_x, room_z, room_yaw;
     uint16_t room_complete_flag;
     bool room_ready;
@@ -138,6 +147,7 @@ const char *sh_alley_hint(const ShAlley *alley);
 bool sh_alley_letterbox(const ShAlley *alley);
 float sh_alley_fade(const ShAlley *alley);
 bool sh_alley_camera(const ShAlley *alley, ShCamera *out);
+bool sh_alley_harry_keyframe(const ShAlley *alley, int *keyframe);
 bool sh_alley_gameplay_camera(ShAlley *alley, const float position[3], float yaw, float dt, ShCamera *out);
 
 bool sh_alley_actor_pose(const ShAlley *alley, int slot, ShActorPose *out);

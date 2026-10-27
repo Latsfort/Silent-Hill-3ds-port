@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "sh3ds/player_collision_data.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,7 +20,6 @@ extern "C" {
  */
 
 #define SH_COLL_MAX_CHUNKS 192
-#define SH_COLL_PLAYER_RADIUS 0.35f
 /* One stair riser / curb only — larger values let Harry walk onto cafe tables. */
 #define SH_COLL_STEP_UP 0.28f
 #define SH_COLL_STEP_DOWN 2.50f

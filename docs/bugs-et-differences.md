@@ -32,6 +32,20 @@ Sources : [savegame.c](../source/game/savegame.c), [points avancés](debug-check
 
 ## Écarts majeurs de gameplay
 
+**D23 — Rayon de collision de Harry différent — corrigé, parcours ciblé vérifié.**
+Le port utilisait 0,35 m. Game_PlayerInfoInit donne Q12(0,3), puis la collision
+convertit ce rayon en Q8 : 76/256 = 0,296875 m. Cette valeur est désormais générée
+depuis le retail. Les tests avec les IPD originaux atteignent l'entrée de ruelle et
+la seconde porte ; les deux bords d'échelle restent stables.
+Le scénario Old 3DS franchit maintenant les deux portes, termine la scène
+d'assombrissement et rend le contrôle avec les drapeaux 13 à 17 posés.
+Le diagnostic précédent de porte inaccessible est retiré : son point décrit un
+plan de porte, et l'approche en marchant depuis le trajet précédent fonctionne aussi
+avec l'ancien rayon. Aucun volume d'action original n'a été agrandi.
+Sources : [collision du port](../source/game/coll.c),
+[paramètre généré](../tools/gen_player_collision.py),
+[scénario de reproduction](../tools/run_alley_regression.ps1).
+
 **D03 — Combat de la ruelle simplifié — confirmé, non corrigé.**
 A retire directement 20 PV aux enfants proches. Leur déplacement suit une poursuite
 simple ; les attaques et collisions de combat retail ne sont pas intégrées à ce chemin.
@@ -106,9 +120,15 @@ Sources : `SH_ALLEY_NIGHTMARE` dans [alley.c](../source/game/alley.c),
 [map0_s00_2.c retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_2.c).
 
 **D13 — Scène de l'obscurité seulement partiellement reprise — confirmé.**
-Le déclenchement et la validation des messages ont été corrigés. Le retail contient
-encore des étapes de chargement de flamme, d'attente et d'animation absentes du
-court enchaînement actuel. La scène entière ne peut donc pas être déclarée fidèle.
+Les étapes 0 à 11, les bordures progressives, l'attente des ressources des ennemis,
+l'animation 84 de Harry, le son 1356 à sa fin et la transition d'éclairage vers le
+préréglage 10 pendant 0,5 seconde sont maintenant intégrés. L'assombrissement sur
+le trajet pilote le préréglage 6. Les deux messages attendent A et le drapeau 17
+est posé à l'étape 11. Ces points passent les tests natifs à 30/60 Hz ; la compilation
+est sans avertissement. Dans Azahar Old 3DS, le scénario parcourt les deux portes,
+atteint les images 980 à 993 de Harry et revient en jeu après les deux messages.
+Le dessin et le chargement de la flamme, la pose du bras après allumage et la
+comparaison visuelle avec le retail sur émulateur/console restent à terminer.
 Sources : `SH_ALLEY_DARKER` dans [alley.c](../source/game/alley.c),
 `MapEven_CutsceneAlleyGetsDarker` dans
 [map0_s00_2.c retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_2.c).

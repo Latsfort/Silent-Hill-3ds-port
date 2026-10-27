@@ -41,6 +41,43 @@ corpse chunk override THRF908 at logical(-7,6), use head-bone camera, then integ
 actual Grey Child combat and Harry death rather than A damage and 45-second timeout.
 Do not treat the present simplified messages or native backend checks as completion.
 
+Continuation update: GetsDarker now retains cases0..11 and original fallthroughs,
+waits for borders, flag16, Grey Child assets and torch animation completion, then
+mixes to environment10 over Q12(.5), sets17 at11 and fades borders out. Its wrong
+black-overlay fade is removed. Path darkness now drives environment6. Torch84
+mapping106/107 and frames973..993 are generated with verified MAP0 ROM/ANM via the
+generalized roof animation extractor (roof output unchanged). Runtime Harry pose
+selection is connected; native 30/60Hz animation/event tests and make pass.
+Still missing: GameFs_FlameGfxLoad/func_8003E740 draw, post-match arm bone rotations,
+environment flicker func_800DD0CC, and visual emulator QA. Do not close D13 yet.
+Autotest logs alley stage/step, torch pose/timer, borders and flags13..17 for the
+next runtime test. First verified source checkpoint pushed to origin/master as
+c74eec8; local binary intentionally not included in the source commit.
+
+Door20 diagnosis corrected by actual IPD walking tests: its param0 is the door
+plane orientation, not Harry's required yaw. From the preceding path PS1 Z>224.2,
+face PS1 yaw180 (3DS yaw180), not0. Native walk at x-110 fromZ227 reaches the
+unmodified trigger with BOTH old.35 and original radius. The broad claim that
+the door is inaccessible is withdrawn; D23 now records the actual radius mismatch.
+Game_PlayerInfoInit setsQ12(.3), collision.c truncates it toQ8 =>76/256=.296875.
+New gen_player_collision.py generates that value; coll.h now imports it. Native
+gate/door approach and both ladder edges pass. No trigger expansion or flag14
+injection. Existing emulator scenario now uses the correct door approach and
+is being rerun with the retail radius. Pending D13 changes remain local after
+c74eec8 until the next verified coherent checkpoint; no completed GPU/console
+torch claim until runtime verification. Next finish flame draw and arm bone pose.
+
+Runtime checkpoint: the corrected run_alley_regression.ps1 now walks forward
+after door20 (source darkness segment fromPS1Z256 to255), instead of waiting at
+the door's spawn. Old 3DS run PASSES: door flags13/14, stage10/case4, baked torch
+frames980..993, case11 with match=true, then ROAM flags13..17 all true. End log:
+f3646 map0, pos(-270,0,-254.95), torch=false/match=true, timer2103, borders fading
+out. This validates event integration and CPU mesh frames, NOT visual parity or
+the still missing flame/arm effect. Radius native generator and ladder tests pass.
+Next publish this coherent source checkpoint to GitHub main (main is still at
+c4b4787, an ancestor; first checkpoint c74eec8 was pushed to master), then finish
+GameFs_FlameGfxLoad/func_8003E740, right-arm local rotations and source flicker.
+
 Full goal remains active: port all scenes/progression/endings faithfully, then verify actual coverage. AGENTS.md applies. One agent; focused changes; reuse existing adapters/generators; user now authorizes make -j4 per coherent large block; run affected checks; do not claim hardware fidelity from native tests.
 
 ## Current verified state
