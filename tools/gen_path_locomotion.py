@@ -14,7 +14,7 @@ def emit():
     lines = ['/* Generated from retail scripted walk/turn speed and yaw calculations. */',
              'void sh_path_locomotion(ShPath *path, ShPathPlayer *player, int keyframe, int32_t dt)', '{',
              '    int32_t yaw_step = 0, headingAngle = 0, speed = player->move_speed;', '    switch (player->state) {']
-    for name in ('WalkForward', 'TurnRight', 'TurnLeft'):
+    for name in ('Reset', 'WalkForward', 'TurnRight', 'TurnLeft'):
         body = source.split('case PlayerState_' + name + ':', 1)[1].split('#endif', 1)[0]
         body = re.sub(r'Q12_ANGLE\(([-\d.]+)f\)', lambda m: str(fixed(m[1], True)), body)
         body = re.sub(r'Q12\(([-\d.]+)f\)', lambda m: str(fixed(m[1])), body)

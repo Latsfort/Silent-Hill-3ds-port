@@ -38,12 +38,10 @@
 #define SH_SPOT_CAM_Y (2.4f)
 #define SH_SPOT_CAM_Z (-130.1f)
 
-/* MapMsgAudioCmds for msgs 21..23 / nightmare 27..28. */
+/* MapMsgAudioCmds for msgs 21..23. */
 #define SH_VO_CHERYL_SPOT 4109
 #define SH_VO_WHERE_GOING 4131
 #define SH_VO_HEY_WAIT 4132
-#define SH_VO_WHAT_IS_THIS 4126
-#define SH_VO_WHATS_GOING 4119
 #define SH_VO_STOP 19
 #define SH_VO_STOP_ALL 22
 
@@ -932,14 +930,10 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
             alley->skip_collision = false;
         } else if (sh_alley_nightmare_trigger(save, px, pz)) {
             alley->stage = SH_ALLEY_NIGHTMARE;
-            /* CutsceneAlleyNightmare case 0: WorldMap_ChunkSet. */
-            alley->nightmare_world = true;
-            alley->nightmare_world_requested = true;
             alley->step = 0;
             alley->wait = 0.0f;
             alley->controls_locked = true;
             alley->letterbox = true;
-            fade_to(alley, 1.0f, 3.0f);
         }
         break;
 
@@ -1078,55 +1072,16 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
         }
         break;
 
-    case SH_ALLEY_NIGHTMARE:
-        alley->controls_locked = true;
-        alley->letterbox = true;
-        alley->cam_active = false;
-        alley->cheryl_visible = false;
-        switch (alley->step) {
-        case 0:
-            /* Don't stall forever if fade never quite hits target. */
-            if (fade_done(alley) || wait_timer(alley, 1.5f, dt)) {
-                alley->fade = 1.0f;
-                alley->fade_target = 1.0f;
-                alley->wait = 0.0f;
-                voice_play(alley, SH_VO_WHAT_IS_THIS);
-                set_msg(alley, "What is this?", NULL, 1.6f);
-                step_next(alley);
-            }
-            break;
-        case 1:
-            if (wait_timer(alley, 1.6f, dt)) {
-                voice_stop(alley);
-                voice_play(alley, SH_VO_WHATS_GOING);
-                set_msg(alley, "What's going on here!?", NULL, 2.5f);
-                step_next(alley);
-            }
-            break;
-        case 2:
-            if (wait_timer(alley, 2.5f, dt)) {
-                voice_stop(alley);
-                /* Ambush sting — grey children stub. */
-                sh_snd_play(SH_SFX_ALLEY_TENSION, 0, 50);
-                step_next(alley);
-            }
-            break;
-        case 3:
-            if (wait_timer(alley, 1.8f, dt)) {
-                step_next(alley);
-            }
-            break;
-        default:
-            sh_save_event_set(save, SH_EV_NIGHTMARE);
-            alley->stage = SH_ALLEY_FIGHT;
-            alley->step = 0;
-            alley->wait = 0.0f;
-            alley->controls_locked = false;
-            alley->letterbox = false;
-            fade_to(alley, 0.0f, 3.0f);
-            break;
-        }
+    case SH_ALLEY_NIGHTMARE: {
+        float position[3] = {px, player_y ? *player_y : 0.0f, pz};
+        float yaw = player_yaw ? *player_yaw : 0.0f;
+        sh_alley_nightmare_update(alley, save, position, &yaw, input, dt);
+        if (player_x) { *player_x = position[0]; }
+        if (player_y) { *player_y = position[1]; }
+        if (player_z) { *player_z = position[2]; }
+        if (player_yaw) { *player_yaw = yaw; }
         break;
+    }
 
     case SH_ALLEY_BLACKOUT:
         /* Retail: fight ends → EventFlag_25/26 → LoadOverlay cafe. Hold black. */
@@ -1178,6 +1133,10 @@ bool sh_alley_update(ShAlley *alley, ShSavegame *save, float *player_x, float *p
 
 bool sh_alley_harry_keyframe(const ShAlley *alley, int *keyframe)
 {
+    if (alley && alley->stage == SH_ALLEY_NIGHTMARE && alley->nightmare.initialized) {
+        *keyframe = alley->nightmare.player.model.keyframe;
+        return true;
+    }
     if (!alley || !alley->torch_active) { return false; }
     *keyframe = alley->torch_player.model.keyframe;
     return true;

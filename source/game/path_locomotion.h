@@ -3,6 +3,43 @@ void sh_path_locomotion(ShPath *path, ShPathPlayer *player, int keyframe, int32_
 {
     int32_t yaw_step = 0, headingAngle = 0, speed = player->move_speed;
     switch (player->state) {
+    case 52:
+
+            if (player->move_speed != 0)
+            {
+                player->move_speed -= PATH_TIMESTEP(dt, 1638) * 2;
+                if (player->move_speed < 0)
+                {
+                    player->move_speed = 0;
+                }
+            }
+
+            yaw_step = 0;
+            speed = player->move_speed;
+
+            path_model_status(&player->extra_model, 26, false);
+            path_model_status(&player->model, 26, false);
+
+            if (player->extra_model.control_state == 0)
+            {
+                player->extra_model.control_state++;
+            }
+
+            switch (player->cutscene_state)
+            {
+                case 3:
+                    sh_path_state_set(player, 56);
+                    break;
+
+                case 4:
+                    sh_path_state_set(player, 57);
+                    break;
+            }
+
+            path_animation_reset(player);
+
+            headingAngle = player->heading_angle = 0;
+            break;
     case 53:
 
             if (player->move_speed > 5734)

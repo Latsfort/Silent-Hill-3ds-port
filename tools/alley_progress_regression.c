@@ -22,7 +22,21 @@ void sh_snd_at(uint16_t id, const float position[3], float volume)
     assert(id == 1356 && volume == 0.5f);
     torch_sounds++;
 }
-void sh_snd_call(uint32_t command) { (void)command; }
+static bool voice_loading;
+static unsigned nightmare_voices;
+void sh_snd_call(uint32_t command)
+{
+    if (command == 4126 || command == 4119) {
+        voice_loading = true;
+        nightmare_voices++;
+    }
+}
+uint8_t sh_sound_streaming(void)
+{
+    const uint8_t result = voice_loading ? 4 : 0;
+    voice_loading = false;
+    return result;
+}
 void sh_bgm_status_set(unsigned flags) { (void)flags; }
 bool sh_bgm_crossfade(int index) { (void)index; return true; }
 void sh_xa_preload(uint16_t command) { (void)command; }
@@ -141,12 +155,29 @@ static void run(float dt)
     x = -252.0f; z = -222.0f;
     sh_alley_update(&alley, &save, &x, &y, &z, &yaw, &input, dt);
     assert(alley.stage == SH_ALLEY_NIGHTMARE);
+    sh_alley_update(&alley, &save, &x, &y, &z, &yaw, &input, dt);
     assert(alley.nightmare_world && alley.nightmare_world_requested);
-    for (int i = 0; i < (int)(10.0f / dt); i++) {
+    nightmare_voices = 0;
+    bool walking_camera = false, body_camera = false;
+    for (int i = 0; i < (int)(20.0f / dt); i++) {
         sh_alley_update(&alley, &save, &x, &y, &z, &yaw, &input, dt);
+        assert(alley.fade == 0.0f);
+        if (alley.step == 3 && alley.cam_active) {
+            walking_camera = true;
+            assert(fabsf(alley.cam.pos[0] - SH_Q12_TO_FLOAT(SH_Q12(-254.63f))) < 0.001f);
+            assert(!alley.nightmare.hidden);
+        }
+        if (alley.nightmare.hidden) {
+            body_camera = true;
+            assert(alley.nightmare.path.waypoint == 2);
+            assert(fabsf(x - SH_Q12_TO_FLOAT(SH_Q12(-251.12f))) < 0.001f);
+            assert(fabsf(z + SH_Q12_TO_FLOAT(SH_Q12(218.56f))) < 0.001f);
+        }
         if (alley.stage == SH_ALLEY_FIGHT) { break; }
     }
     assert(alley.stage == SH_ALLEY_FIGHT && sh_save_event_get(&save, 24));
+    assert(walking_camera && body_camera && nightmare_voices == 2);
+    assert(!alley.nightmare.hidden && !alley.cam_active && !alley.controls_locked);
     assert(!sh_alley_nightmare_trigger(&save, -62.0f, -118.0f));
     assert(!sh_alley_nightmare_trigger(&save, -252.0f, -222.0f));
     sh_alley_reset(&alley);

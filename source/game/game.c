@@ -774,6 +774,7 @@ static bool bake_harry_frame(ShGame *game, int keyframe, bool use_wep)
     s_harry_light_bone_valid = sh_chara_last_bone((unsigned)sh_env_flashlight_bone(), &s_harry_light_bone);
     s_harry_hand_bone_valid = sh_chara_last_bone(sh_drain_valve_hand_bone(), &s_harry_hand_bone);
     s_match_hand_bone_valid = sh_chara_last_bone(SH_HARRY_HELD_BONE, &s_match_hand_bone);
+    game->alley.nightmare.head_valid = sh_chara_last_bone((unsigned)sh_alley_nightmare_head_bone(), &game->alley.nightmare.head);
     if (s_harry_have_tim && s_harry_cluts.count > 0 && !s_harry_tim_uploaded) {
         s_harry_tim_uploaded = sh_gfx_set_player_clut_atlas(&s_harry_tim_parsed, s_phone_tim_ready ? &s_phone_tim : NULL, &s_harry_cluts);
     }
@@ -3234,6 +3235,7 @@ static void render_map(const ShGame *game)
     ShPlayerPose player = {0};
     player.visible = game->harry_ready && game->area_loaded && !inv_open;
     if (sh_school_map_is_school(game->save.map_idx) && game->town.school.player_hidden) { player.visible = false; }
+    if (sh_alley_active(&game->alley) && game->alley.nightmare.hidden) { player.visible = false; }
     player.pos[0] = game->player_pos[0];
     player.pos[1] = game->player_pos[1];
     player.pos[2] = game->player_pos[2];

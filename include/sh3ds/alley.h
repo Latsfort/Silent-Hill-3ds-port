@@ -13,6 +13,7 @@
 #include "sh3ds/border.h"
 #include "sh3ds/environment.h"
 #include "sh3ds/alley_flicker.h"
+#include "sh3ds/alley_nightmare.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,7 +53,7 @@ typedef enum ShAlleyStage {
     SH_ALLEY_DARKER,    /* MapEven_CutsceneAlleyGetsDarker */
     SH_ALLEY_DEAD_END,  /* "A dead end? What the hell!?" */
     SH_ALLEY_FIGHT,     /* Grey Children after EventFlag_17 */
-    SH_ALLEY_NIGHTMARE, /* MapEvent_CutsceneAlleyNightmare → blackout */
+    SH_ALLEY_NIGHTMARE, /* MapEvent_CutsceneAlleyNightmare */
     SH_ALLEY_BLACKOUT,  /* hold black, stop SFX, hand off to cafe */
     SH_ALLEY_ROOM,
     SH_ALLEY_TO_CAFE
@@ -92,6 +93,7 @@ typedef struct ShAlley {
     bool flame_requested;
     bool nightmare_world;
     bool nightmare_world_requested;
+    ShNightmare nightmare;
 
     bool cam_active;
     ShCamera cam;
@@ -153,6 +155,8 @@ bool sh_alley_letterbox(const ShAlley *alley);
 float sh_alley_fade(const ShAlley *alley);
 bool sh_alley_camera(const ShAlley *alley, ShCamera *out);
 bool sh_alley_harry_keyframe(const ShAlley *alley, int *keyframe);
+void sh_alley_nightmare_update(ShAlley *alley, ShSavegame *save, float position[3], float *yaw,
+    const ShInputState *input, float dt);
 bool sh_alley_gameplay_camera(ShAlley *alley, const float position[3], float yaw, float dt, ShCamera *out);
 
 bool sh_alley_actor_pose(const ShAlley *alley, int slot, ShActorPose *out);

@@ -112,21 +112,35 @@ Sources : `SH_ALLEY_FMV` dans [alley.c](../source/game/alley.c),
 [événements retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_events_data.c),
 [lecteur retail](../vendor/silent-hill-decomp/src/screens/stream/stream.c).
 
-**D12 — Mise en scène du corps dans la ruelle incomplète — confirmé ; décor corrigé.**
-Le retail déplace Harry puis montre le corps avec une caméra liée à sa tête.
-Le port présente les répliques avec caméra scriptée désactivée et fondu noir.
+**D12 — Mise en scène du corps dans la ruelle — logique et rendu intégrés ; fidélité visuelle à vérifier.**
+Le port utilisait un fondu noir, une caméra désactivée et des attentes ajoutées.
+Les deux switchs retail sont maintenant raccordés : approche par les deux
+points d'origine, orientation finale du dernier waypoint, caméra fixe pendant
+la marche, première vue du corps puis caméra liée à l'os de la tête, Harry
+masqué pendant cette vue et restauration de la caméra de jeu en sortie.
+Les cases 0..4 et la sortie conservent l'ordre retail. Les bordures remplacent
+le fondu noir ajouté. Les messages 27/28 réutilisent le contrôleur de texte
+retail avec leurs durées, leurs règles de saut et l'attente de chargement XA.
+La chaîne audio provient du binaire vérifié ; le son 1359 reçoit l'atténuation
+brute Q8(13/16), sans conversion en volume.
 Le déclenchement remplace désormais THRF906 par THRF908 au morceau logique
 (-7, 6), comme `WorldMap_ChunkSet`, en déplaçant ensemble le décor et les
 origines des collisions (`func_80044044`). Le rechargement conserve la position
-et l'orientation de Harry. Ce remplacement ne corrige pas encore la caméra,
-le parcours de Harry ni les délais des répliques.
+et l'orientation de Harry pendant le chargement.
 Le test natif `tools/ipd_relocation_regression.c` vérifie sur THRF908 les
 2 223 sommets, les textures et couleurs inchangées, les origines des collisions,
 l'aller-retour exact des octets et le rejet des entrées tronquées.
 Compilation 3DS sans avertissement et progression native à 30/60 FPS vérifiées.
+`tools/gen_alley_nightmare.py --check` compare les données générées avec les
+deux waypoints, les sept commandes de caméra, les messages et la chaîne audio
+du code/binaire d'origine. `tools/nightmare_head_regression.c` vérifie la cible
+de caméra à partir du vrai modèle et des vraies animations de Harry à 30/60 FPS,
+avec START maintenu ou relâché, et simule l'attente XA sur chaque réplique.
 `tools/run_alley_regression.ps1 -Nightmare` passe sous Azahar configuré Old 3DS :
-chargement de THRF908 relocalisé, fin de scène et retour au combat actuel.
-Ni fidélité visuelle de la scène ni exécution sur console vérifiées.
+chargement de THRF908 relocalisé, marche, caméra de tête, seconde réplique,
+fin de scène et retour au combat actuel. La fidélité visuelle et sonore, le
+mélange entre poses et l'exécution sur console restent à vérifier. Le contrôleur
+de déplacement général et le comportement des Grey Children restent D10/D03.
 Sources : `SH_ALLEY_NIGHTMARE` dans [alley.c](../source/game/alley.c),
 `MapEvent_CutsceneAlleyNightmare` dans
 [map0_s00_2.c retail](../vendor/silent-hill-decomp/src/maps/map0_s00/map0_s00_2.c).

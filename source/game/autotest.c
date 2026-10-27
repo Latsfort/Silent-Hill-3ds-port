@@ -215,6 +215,10 @@ void sh_autotest_log(ShGame *g)
     }
     if (sh_alley_active(&g->alley)) {
         if (g->alley.nightmare_world) {
+            fprintf(s_log, "nightmare scene=%d path=%d/%d camera=%d head=%d hidden=%d voices=%u text=%d\n",
+                g->alley.step, g->alley.nightmare.path.step, g->alley.nightmare.path.waypoint,
+                g->alley.cam_active, g->alley.nightmare.head_valid, g->alley.nightmare.hidden,
+                g->alley.nightmare.voice_index, g->alley.nightmare.text.current);
             for (int i = 0; i < g->chunk_count; i++) {
                 const ShMapChunk *chunk = &g->chunks[i];
                 if (chunk->x == -7 && chunk->z == 6) {

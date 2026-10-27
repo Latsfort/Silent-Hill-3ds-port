@@ -19,7 +19,7 @@ def emit():
              'static const ShPathAnimDef s_path_animation_defs[] = {']
     count = 0
     for kind, name, active, variable, link, duration, first, last in re.findall(pattern, table):
-        if name not in ('HarryAnim_WalkForward', 'HarryAnim_TurnLeft', 'HarryAnim_TurnRight'):
+        if name not in ('HarryAnim_Idle', 'HarryAnim_WalkForward', 'HarryAnim_TurnLeft', 'HarryAnim_TurnRight'):
             continue
         status = g.value(name) * 2 + (active == 'true')
         if link == 'NO_VALUE': link_value = -1
@@ -30,7 +30,7 @@ def emit():
         rate = 0 if variable == 'true' else fixed(re.search(r'Q12\(([-\d.]+)f\)', duration)[1])
         lines.append(f'    {{{status}, {1 if kind == "Anim_BlendLinear" else 0}, {variable}, {{{-1 if first == "NO_VALUE" else first}, {last}, {link_value}}}, {rate}}},')
         count += 1
-    assert count == 6
+    assert count == 8
     config = (ROOT / 'vendor/silent-hill-decomp/configs/USA/maps/map1_s02.yaml').read_text(encoding='utf-8')
     raw = (ROOT / 'dump/assets/VIN/MAP1_S02.BIN').read_bytes()
     assert hashlib.sha1(raw).hexdigest() == re.search(r'^sha1: (\w+)', config, re.M)[1]
@@ -76,6 +76,6 @@ if __name__ == '__main__':
     data = emit()
     if '--check' in sys.argv:
         assert OUTPUT.read_text(encoding='ascii') == data
-        print('PASS: walk/turn and school clips, verified overlay mappings and walk cadence')
+        print('PASS: idle/walk/turn and school clips, verified overlay mappings and walk cadence')
     else:
         OUTPUT.write_text(data, encoding='ascii', newline='\n')
